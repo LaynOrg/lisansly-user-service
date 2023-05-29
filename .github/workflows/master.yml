@@ -86,14 +86,7 @@ jobs:
       - uses: jsdaniell/create-json@v1.2.2
         with:
           name: "env.dev.json"
-          json: |
-            '{
-              "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
-              "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
-              "MONGO_URI": "${{ secrets.DEV_MONGODB_URI }}",
-              "MONGODB_USERNAME": "${{ secrets.DEV_MONGODB_USERNAME }}",
-              "MONGODB_PASSWORD": "${{ secrets.DEV_MONGODB_PASSWORD }}"
-            }'
+          json: '{"JWT_PRIVATE_KEY":"${{ secrets.JWT_PRIVATE_KEY }}", "JWT_PUBLIC_KEY":"${{ secrets.JWT_PUBLIC_KEY }}", "MONGO_URI":"${{ secrets.DEV_MONGODB_URI }}", "MONGODB_USERNAME":"${{ secrets.DEV_MONGODB_USERNAME }}", "MONGODB_PASSWORD":"${{ secrets.DEV_MONGODB_PASSWORD }}"}'
 
       - uses: serverless/github-action@v3.2
         with:
