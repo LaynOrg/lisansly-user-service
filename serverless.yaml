@@ -3,13 +3,16 @@ service: UserAPI
 provider:
   name: aws
   runtime: go1.x
-  environment:
-    
+  region: us-west-1
 
 functions:
   AuthApi:
     handler: user-api
+    environment: ${file(env.${opt:stage, self:provider.stage}.json)}
     events:
+      - http:
+          method: GET
+          path: /health
       - http:
           method: POST
           path: /user

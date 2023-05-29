@@ -83,16 +83,22 @@ jobs:
         with:
           name: ${{ env.APP_NAME }}
 
+      - uses: jsdaniell/create-json@v1.2.2
+        with:
+          name: "env.dev.json"
+          json: |
+            '{
+              "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
+              "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
+              "MONGO_URI": "${{ secrets.DEV_MONGODB_URI }}",
+              "MONGODB_USERNAME": "${{ secrets.DEV_MONGODB_USERNAME }}",
+              "MONGODB_PASSWORD": "${{ secrets.DEV_MONGODB_PASSWORD }}"
+            }'
+
       - uses: serverless/github-action@v3.2
         with:
-          args: deploy
+          args: deploy --stage dev
         env:
           IS_AT_REMOTE: "true"
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
-          JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
-          MONGO_URI: ${{ secrets.MONGODB_URI }}
-          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
-          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
-
