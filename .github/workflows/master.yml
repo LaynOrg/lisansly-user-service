@@ -1,0 +1,98 @@
+name: CI/CD
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  APP_NAME: ${{ github.event.repository.name }}
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/go-cache
+
+      - name: Linting
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+
+  build:
+    needs:
+      - lint
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/go-cache
+
+      - name: Build
+        shell: bash
+        run: CGO_ENABLED=0 GOOS=linux go build -o $APP_NAME .
+
+      - name: Upload executable file as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.APP_NAME }}
+          path: ${{ env.APP_NAME }}
+          if-no-files-found: error
+
+  unit-test:
+    needs:
+      - build
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/go-cache
+
+      - run: |
+          go test -tags=unit -coverprofile coverage.out -covermode count ./...
+          go tool cover -func coverage.out
+
+  security-analysis:
+    needs:
+      - unit-test
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run security analysis with gosec
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
+  deploy-to-dev:
+    needs:
+      - security-analysis
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.APP_NAME }}
+
+      - uses: serverless/github-action@v3.2
+        with:
+          args: deploy
+        env:
+          IS_AT_REMOTE: "true"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+          JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
+          MONGO_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+

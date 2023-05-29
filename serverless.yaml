@@ -1,0 +1,21 @@
+service: UserAPI
+
+provider:
+  name: aws
+  runtime: go1.x
+  environment:
+    
+
+functions:
+  AuthApi:
+    handler: user-api
+    events:
+      - http:
+          method: POST
+          path: /user
+      - http:
+          method: GET
+          path: /user/email/{userEmail}/password/{userPassword}
+      - http:
+          method: GET
+          path: /user/{userId}/refreshToken/{refreshToken}

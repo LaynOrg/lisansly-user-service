@@ -1,0 +1,11 @@
+{
+  "name": "auth-api",
+  "version": "1.0.0",
+  "main": "main.go",
+  "repository": "git@github.com:Lisansly/auth-api.git",
+  "author": "Lisansly",
+  "license": "MIT",
+  "devDependencies": {
+    "serverless": "^3.31.0"
+  }
+}

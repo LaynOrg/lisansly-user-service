@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/tekwizely/pre-commit-golang
+    rev: v1.0.0-rc.1
+    hooks:
+      - id: my-cmd-mod
+        name: unit test
+        alias: unit test
+        args: [make, test]
+
+      - id: my-cmd-mod
+        name: gosec
+        args: [make, security-analysis]
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: golangci-lint
