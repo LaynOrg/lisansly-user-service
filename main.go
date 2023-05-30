@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"os"
 	"path/filepath"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 
-	"user-api/internal/user"
+	"user-api/internal"
 	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
 	"user-api/pkg/logger"
@@ -52,6 +53,7 @@ func main() {
 	logMiddleware := logger.Middleware(log)
 	app := srv.GetFiberInstance()
 	app.Use(logMiddleware)
+	app.Use(cors.New())
 	app.Get("/health", func(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusOK).SendString("OK")
 	})
