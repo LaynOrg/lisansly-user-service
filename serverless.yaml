@@ -5,6 +5,11 @@ provider:
   runtime: go1.x
   region: us-west-1
 
+package:
+  patterns:
+    - "!./**/**"
+    - "user-api"
+
 functions:
   UserAPI:
     handler: user-api

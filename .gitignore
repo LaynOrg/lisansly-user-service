@@ -6,7 +6,7 @@ node_modules/
 build/
 yarn-error.log
 .serverless/
-auth-api
+user-api
 coverage.out
 coverage.out.tmp
 tmp/
