@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"os"
 	"path/filepath"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 
 	"user-api/internal"
