@@ -6,7 +6,7 @@ provider:
   region: us-west-1
 
 functions:
-  AuthApi:
+  UserAPI:
     handler: user-api
     environment: ${file(env.${opt:stage, self:provider.stage}.json)}
     events:
