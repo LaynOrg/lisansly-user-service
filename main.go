@@ -9,7 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 
-	"user-api/internal"
+	user "user-api/internal"
 	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
 	"user-api/pkg/logger"
