@@ -4,13 +4,21 @@ const (
 	RoleUser = "user"
 )
 
-type UserPayload struct {
+type UserRegisterPayload struct {
+	Name     string `json:"name" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
 }
 
+type UserLoginPayload struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type UserDocument struct {
 	Id        string `bson:"_id"`
+	Name      string `json:"name"`
 	Email     string `bson:"email"`
 	Password  string `bson:"password"`
 	Role      string `bson:"role"`

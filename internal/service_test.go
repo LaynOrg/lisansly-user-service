@@ -58,6 +58,7 @@ mwIDAQAB
 
 const (
 	TestUserId            = "abcd-abcd-abcd-abcd-abcd"
+	TestUserName          = "Lynicis"
 	TestEmail             = "test@test.com"
 	TestPassword          = "12345"
 	TestEncryptedPassword = "$2a$10$aoVeJWgCZe6sueOO3wEIQOoZA3DbolyP6aTTMgmcbsmC3MojKdFme\n"
@@ -92,7 +93,7 @@ func TestService_Register(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := userService.Register(ctx, &UserPayload{
+		tokens, err := userService.Register(ctx, &UserRegisterPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -114,7 +115,7 @@ func TestService_Register(t *testing.T) {
 			)
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Register(ctx, &UserPayload{
+		_, err := userService.Register(ctx, &UserRegisterPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -138,7 +139,7 @@ func TestService_Register(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Register(ctx, &UserPayload{
+		_, err := userService.Register(ctx, &UserRegisterPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -167,7 +168,7 @@ func TestService_Register(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Register(ctx, &UserPayload{
+		_, err := userService.Register(ctx, &UserRegisterPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -192,7 +193,7 @@ func TestService_Register(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		_, err = userService.Register(ctx, &UserPayload{
+		_, err = userService.Register(ctx, &UserRegisterPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -227,7 +228,7 @@ func TestService_Login(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := userService.Login(ctx, &UserPayload{
+		tokens, err := userService.Login(ctx, &UserLoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -246,7 +247,7 @@ func TestService_Login(t *testing.T) {
 			Return(nil, errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Login(ctx, &UserPayload{
+		_, err := userService.Login(ctx, &UserLoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -268,7 +269,7 @@ func TestService_Login(t *testing.T) {
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Login(ctx, &UserPayload{
+		_, err := userService.Login(ctx, &UserLoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -297,7 +298,7 @@ func TestService_Login(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Login(ctx, &UserPayload{
+		_, err := userService.Login(ctx, &UserLoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -331,7 +332,7 @@ func TestService_Login(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Login(ctx, &UserPayload{
+		_, err := userService.Login(ctx, &UserLoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -361,7 +362,7 @@ func TestService_Login(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		_, err = userService.Login(ctx, &UserPayload{
+		_, err = userService.Login(ctx, &UserLoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})

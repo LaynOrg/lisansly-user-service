@@ -23,7 +23,7 @@ functions:
           path: /user
       - http:
           method: GET
-          path: /user/email/{userEmail}/password/{userPassword}
+          path: /user/identifier/{userIdentifier}/password/{userPassword}
       - http:
           method: GET
           path: /user/{userId}/refreshToken/{refreshToken}

@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"user-api/pkg/cerror"
+	"user-api/pkg/jwt_generator"
 	"user-api/pkg/logger"
 	"user-api/pkg/server"
 )
@@ -18,7 +19,7 @@ type handler struct {
 
 func (h *handler) RegisterRoutes(app *fiber.App) {
 	app.Post("/user", h.Register)
-	app.Get("/user/email/:email/password/:password", h.Login)
+	app.Get("/user/identifier/:identifier/password/:password", h.Login)
 	app.Get("/user/:userId/refreshToken/:refreshToken", h.GetAccessToken)
 }
 
@@ -29,12 +30,14 @@ func NewHandler(userService Service) server.Handler {
 }
 
 func (h *handler) Register(ctx *fiber.Ctx) error {
+	var err error
+
 	log := logger.FromContext(ctx.Context()).
-		With(zap.String("eventName", "registerWithEmail"))
+		With(zap.String("eventName", "register"))
 	logger.InjectContext(ctx.Context(), log)
 
-	var user UserPayload
-	err := ctx.BodyParser(&user)
+	var user *UserRegisterPayload
+	err = ctx.BodyParser(&user)
 	if err != nil {
 		return cerror.NewError(
 			fiber.StatusBadRequest,
@@ -52,7 +55,8 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 		).SetSeverity(zap.WarnLevel)
 	}
 
-	tokens, err := h.userService.Register(ctx.Context(), &user)
+	var tokens *jwt_generator.Tokens
+	tokens, err = h.userService.Register(ctx.Context(), user)
 	if err != nil {
 		return err
 	}
@@ -64,14 +68,26 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 }
 
 func (h *handler) Login(ctx *fiber.Ctx) error {
+	var err error
+
 	log := logger.FromContext(ctx.Context()).
 		With(zap.String("eventName", "loginWithEmail"))
 	logger.InjectContext(ctx.Context(), log)
 
-	tokens, err := h.userService.Login(ctx.Context(), &UserPayload{
-		Email:    ctx.Params("email"),
-		Password: ctx.Params("password"),
-	})
+	identifier := ctx.Params("identifier")
+	validate := validator.New()
+	err = validate.Var(identifier, "required,email")
+
+	user := &UserLoginPayload{}
+	if err != nil {
+		user.Name = identifier
+	} else {
+		user.Email = identifier
+	}
+	user.Password = ctx.Params("password")
+
+	var tokens *jwt_generator.Tokens
+	tokens, err = h.userService.Login(ctx.Context(), user)
 	if err != nil {
 		return err
 	}
@@ -83,13 +99,17 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 }
 
 func (h *handler) GetAccessToken(ctx *fiber.Ctx) error {
+	var err error
+
 	log := logger.FromContext(ctx.Context()).
 		With(zap.String("eventName", "getAccessToken"))
 	logger.InjectContext(ctx.Context(), log)
 
 	userId := ctx.Params("userId")
 	refreshToken := ctx.Params("refreshToken")
-	accessToken, err := h.userService.GetAccessToken(ctx.Context(), userId, refreshToken)
+
+	var accessToken string
+	accessToken, err = h.userService.GetAccessToken(ctx.Context(), userId, refreshToken)
 	if err != nil {
 		return err
 	}

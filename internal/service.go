@@ -15,8 +15,8 @@ import (
 )
 
 type Service interface {
-	Register(ctx context.Context, user *UserPayload) (*jwt_generator.Tokens, error)
-	Login(ctx context.Context, user *UserPayload) (*jwt_generator.Tokens, error)
+	Register(ctx context.Context, user *UserRegisterPayload) (*jwt_generator.Tokens, error)
+	Login(ctx context.Context, user *UserLoginPayload) (*jwt_generator.Tokens, error)
 	GetAccessToken(ctx context.Context, userId, refreshToken string) (string, error)
 }
 
@@ -32,8 +32,11 @@ func NewService(userRepository Repository, jwtGenerator jwt_generator.JwtGenerat
 	}
 }
 
-func (s *service) Register(ctx context.Context, user *UserPayload) (*jwt_generator.Tokens, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt_generator.Tokens, error) {
+	var err error
+
+	var hashedPassword []byte
+	hashedPassword, err = bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -42,8 +45,10 @@ func (s *service) Register(ctx context.Context, user *UserPayload) (*jwt_generat
 		)
 	}
 
-	userId, err := s.userRepository.InsertUser(ctx, &UserDocument{
+	var userId string
+	userId, err = s.userRepository.InsertUser(ctx, &UserDocument{
 		Id:        uuid.New().String(),
+		Name:      user.Name,
 		Email:     user.Email,
 		Password:  string(hashedPassword),
 		Role:      RoleUser,
@@ -53,8 +58,9 @@ func (s *service) Register(ctx context.Context, user *UserPayload) (*jwt_generat
 		return nil, err
 	}
 
+	var accessToken string
 	accessTokenExpiresAt := time.Now().Add(10 * time.Minute)
-	accessToken, err := s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, userId)
+	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, userId)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -63,8 +69,9 @@ func (s *service) Register(ctx context.Context, user *UserPayload) (*jwt_generat
 		)
 	}
 
+	var refreshToken string
 	refreshTokenExpiresAt := time.Now().Add(168 * time.Hour)
-	refreshToken, err := s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Email, userId)
+	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Email, userId)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -89,10 +96,28 @@ func (s *service) Register(ctx context.Context, user *UserPayload) (*jwt_generat
 	}, nil
 }
 
-func (s *service) Login(ctx context.Context, claimedUser *UserPayload) (*jwt_generator.Tokens, error) {
-	user, err := s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
-	if err != nil {
-		return nil, err
+func (s *service) Login(
+	ctx context.Context,
+	claimedUser *UserLoginPayload,
+) (
+	*jwt_generator.Tokens,
+	error,
+) {
+	var (
+		user *UserDocument
+		err  error
+	)
+
+	if claimedUser.Email != "" {
+		user, err = s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		user, err = s.userRepository.FindUserWithName(ctx, claimedUser.Name)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(claimedUser.Password))
@@ -103,8 +128,9 @@ func (s *service) Login(ctx context.Context, claimedUser *UserPayload) (*jwt_gen
 		)
 	}
 
+	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err := s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, user.Id)
+	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, user.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -113,8 +139,9 @@ func (s *service) Login(ctx context.Context, claimedUser *UserPayload) (*jwt_gen
 		)
 	}
 
+	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(168 * time.Hour)
-	refreshToken, err := s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Email, user.Id)
+	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Email, user.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -140,7 +167,10 @@ func (s *service) Login(ctx context.Context, claimedUser *UserPayload) (*jwt_gen
 }
 
 func (s *service) GetAccessToken(ctx context.Context, userId, refreshToken string) (string, error) {
-	refreshTokenDocument, err := s.userRepository.FindRefreshTokenWithUserId(ctx, userId)
+	var err error
+
+	var refreshTokenDocument *RefreshTokenHistoryDocument
+	refreshTokenDocument, err = s.userRepository.FindRefreshTokenWithUserId(ctx, userId)
 	if err != nil {
 		return "", err
 	}
@@ -161,13 +191,15 @@ func (s *service) GetAccessToken(ctx context.Context, userId, refreshToken strin
 		).SetSeverity(zapcore.WarnLevel)
 	}
 
-	user, err := s.userRepository.FindUserWithId(ctx, userId)
+	var user *UserDocument
+	user, err = s.userRepository.FindUserWithId(ctx, userId)
 	if err != nil {
 		return "", err
 	}
 
+	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err := s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, user.Id)
+	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, user.Id)
 	if err != nil {
 		return "", cerror.NewError(
 			fiber.StatusInternalServerError,

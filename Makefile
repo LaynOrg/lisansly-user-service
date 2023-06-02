@@ -27,6 +27,6 @@ coverage-report:
 	go tool cover -html=coverage.out
 
 generate-mock:
-	mockgen --source=internal/user/repository.go --destination=internal/user/repository_mock.go --package=user
-	mockgen --source=internal/user/service.go --destination=internal/user/service_mock.go --package=user
+	mockgen --source=internal/repository.go --destination=internal/repository_mock.go --package=user
+	mockgen --source=internal/service.go --destination=internal/service_mock.go --package=user
 	mockgen --source=pkg/jwt_generator/jwt.go --destination=pkg/jwt_generator/jwt_mock.go --package=jwt_generator

@@ -18,6 +18,7 @@ type Repository interface {
 	InsertUser(ctx context.Context, user *UserDocument) (string, error)
 	FindUserWithId(ctx context.Context, userId string) (*UserDocument, error)
 	FindUserWithEmail(ctx context.Context, email string) (*UserDocument, error)
+	FindUserWithName(ctx context.Context, name string) (*UserDocument, error)
 	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryDocument) error
 	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryDocument, error)
 }
@@ -53,7 +54,10 @@ func (r *repository) InsertUser(ctx context.Context, user *UserDocument) (string
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
 	var foundUser bson.D
-	filter := bson.D{{"email", user.Email}}
+	filter := bson.D{{"$or", bson.A{
+		bson.D{{"email", user.Email}},
+		bson.D{{"name", user.Name}},
+	}}}
 	err = collection.FindOne(ctx, &filter).Decode(&foundUser)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return "", cerror.NewError(
@@ -156,6 +160,46 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*User
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
 			"error occurred while find user with email",
+			zap.Error(err),
+		)
+	}
+
+	return &user, nil
+}
+
+func (r *repository) FindUserWithName(ctx context.Context, name string) (*UserDocument, error) {
+	credentials := options.Client().
+		ApplyURI(r.config.Mongodb.Uri).
+		SetAuth(options.Credential{
+			Username: r.config.Mongodb.Username,
+			Password: r.config.Mongodb.Password,
+		})
+
+	client, err := mongo.Connect(ctx, credentials)
+	if err != nil {
+		return nil, cerror.NewError(fiber.StatusInternalServerError, "database connection error")
+	}
+	defer client.Disconnect(ctx) //nolint:errcheck
+
+	collection := client.
+		Database(r.config.Mongodb.Database).
+		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
+
+	var user UserDocument
+
+	filter := bson.D{{"name", name}}
+	result := collection.FindOne(ctx, &filter).Decode(&user)
+	if result != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, cerror.NewError(
+				fiber.StatusNotFound,
+				"user not found",
+			).SetSeverity(zapcore.WarnLevel)
+		}
+
+		return nil, cerror.NewError(
+			fiber.StatusInternalServerError,
+			"error occurred while find user with name",
 			zap.Error(err),
 		)
 	}

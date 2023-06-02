@@ -23,6 +23,10 @@ linters:
 severity:
   default-severity: error
 
+linters-settings:
+  funlen:
+    lines: 100
+
 issues:
   exclude:
     - _test\.go

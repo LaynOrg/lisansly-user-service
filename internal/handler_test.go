@@ -4,13 +4,13 @@ package user
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -34,8 +34,9 @@ func TestNewHandler(t *testing.T) {
 }
 
 func TestHandler_Register(t *testing.T) {
-	TestUserModel := UserPayload{
+	TestUserModel := UserRegisterPayload{
 		Email:    TestEmail,
+		Name:     TestUserName,
 		Password: TestPassword,
 	}
 
@@ -80,7 +81,7 @@ func TestHandler_Register(t *testing.T) {
 	})
 
 	t.Run("when validator cant validate payload struct should return error", func(t *testing.T) {
-		TestUserModel := UserPayload{
+		TestUserModel := UserRegisterPayload{
 			Email:    TestInvalidMail,
 			Password: TestPassword,
 		}
@@ -128,37 +129,68 @@ func TestHandler_Register(t *testing.T) {
 }
 
 func TestHandler_Login(t *testing.T) {
-	TestUserModel := UserPayload{
-		Email:    TestEmail,
-		Password: TestPassword,
-	}
-
 	mockController := gomock.NewController(t)
 	defer mockController.Finish()
 
 	t.Run("happy path", func(t *testing.T) {
-		app := fiber.New()
+		t.Run("email", func(t *testing.T) {
+			TestUserModel := UserLoginPayload{
+				Email:    TestEmail,
+				Password: TestPassword,
+			}
+			app := fiber.New()
 
-		mockUserService := NewMockService(mockController)
-		mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(&jwt_generator.Tokens{
-			AccessToken:  TestAccessToken,
-			RefreshToken: TestRefreshToken,
-		}, nil)
+			mockUserService := NewMockService(mockController)
+			mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(&jwt_generator.Tokens{
+				AccessToken:  TestAccessToken,
+				RefreshToken: TestRefreshToken,
+			}, nil)
 
-		userHandler := NewHandler(mockUserService)
-		userHandler.RegisterRoutes(app)
+			userHandler := NewHandler(mockUserService)
+			userHandler.RegisterRoutes(app)
 
-		req := httptest.NewRequest(
-			fiber.MethodGet,
-			fmt.Sprintf("/user/email/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
-			nil,
-		)
-		resp, _ := app.Test(req)
+			req := httptest.NewRequest(
+				fiber.MethodGet,
+				fmt.Sprintf("/user/identifier/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
+				nil,
+			)
+			resp, _ := app.Test(req)
 
-		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+			assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		})
+
+		t.Run("username", func(t *testing.T) {
+			TestUserModel := UserLoginPayload{
+				Name:     TestUserName,
+				Password: TestPassword,
+			}
+			app := fiber.New()
+
+			mockUserService := NewMockService(mockController)
+			mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(&jwt_generator.Tokens{
+				AccessToken:  TestAccessToken,
+				RefreshToken: TestRefreshToken,
+			}, nil)
+
+			userHandler := NewHandler(mockUserService)
+			userHandler.RegisterRoutes(app)
+
+			req := httptest.NewRequest(
+				fiber.MethodGet,
+				fmt.Sprintf("/user/identifier/%s/password/%s", TestUserModel.Name, TestUserModel.Password),
+				nil,
+			)
+			resp, _ := app.Test(req)
+
+			assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		})
 	})
 
 	t.Run("when user service return error should return it", func(t *testing.T) {
+		TestUserModel := UserLoginPayload{
+			Email:    TestEmail,
+			Password: TestPassword,
+		}
 		app := fiber.New(fiber.Config{
 			ErrorHandler: cerror.Middleware,
 		})
@@ -174,7 +206,7 @@ func TestHandler_Login(t *testing.T) {
 
 		req := httptest.NewRequest(
 			fiber.MethodGet,
-			fmt.Sprintf("/user/email/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
+			fmt.Sprintf("/user/identifier/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
 			nil,
 		)
 		resp, _ := app.Test(req)
