@@ -35,7 +35,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: CGO_ENABLED=0 GOOS=linux go build -o $APP_NAME ./...
+        run: CGO_ENABLED=0 GOOS=linux go build -o $APP_NAME .
 
       - name: Upload executable file as artifact
         uses: actions/upload-artifact@v3
