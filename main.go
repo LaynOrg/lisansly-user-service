@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 
 	user "user-api/internal"
@@ -53,7 +52,6 @@ func main() {
 	logMiddleware := logger.Middleware(log)
 	app := srv.GetFiberInstance()
 	app.Use(logMiddleware)
-	app.Use(cors.New())
 	app.Get("/health", func(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusOK).SendString("OK")
 	})

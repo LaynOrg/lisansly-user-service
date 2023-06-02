@@ -18,12 +18,20 @@ functions:
       - http:
           method: GET
           path: /health
+          cors:
+            origin: "*"
       - http:
           method: POST
           path: /user
+          cors:
+            origin: "*"
       - http:
           method: GET
           path: /user/identifier/{userIdentifier}/password/{userPassword}
+          cors:
+            origin: "*"
       - http:
           method: GET
           path: /user/{userId}/refreshToken/{refreshToken}
+          cors:
+            origin: "*"
