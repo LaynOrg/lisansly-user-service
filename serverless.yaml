@@ -19,19 +19,51 @@ functions:
           method: GET
           path: /health
           cors:
-            origin: "*"
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
       - http:
           method: POST
           path: /user
           cors:
-            origin: "*"
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
       - http:
           method: GET
           path: /user/identifier/{userIdentifier}/password/{userPassword}
           cors:
-            origin: "*"
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
       - http:
           method: GET
           path: /user/{userId}/refreshToken/{refreshToken}
           cors:
-            origin: "*"
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
