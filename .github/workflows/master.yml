@@ -87,14 +87,14 @@ jobs:
           touch env.dev.json
           echo '{
             "IS_AT_REMOTE": true,
-            "JWT_PRIVATE_KEY": "${{secrets.JWT_PRIVATE_KEY}}",
-            "JWT_PUBLIC_KEY": "${{secrets.JWT_PUBLIC_KEY}}",
-            "MONGODB_URI": "${{secrets.DEV_MONGODB_URI}}",
-            "MONGODB_USERNAME": "${{secrets.DEV_MONGODB_USERNAME}}",
-            "MONGODB_PASSWORD": "${{secrets.DEV_MONGODB_PASSWORD}}",
-            "MONGODB_DATABASE": "${{secrets.DEV_MONGODB_DATABASE}}",
-            "MONGODB_USER_COLLECTION": "${{secrets.DEV_MONGODB_USER_COLLECTION}}",
-            "MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION": "${{secrets.DEV_MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION}}"
+            "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
+            "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
+            "MONGODB_URI": "${{ secrets.DEV_MONGODB_URI }}",
+            "MONGODB_USERNAME": "${{ secrets.DEV_MONGODB_USERNAME }}",
+            "MONGODB_PASSWORD": "${{ secrets.DEV_MONGODB_PASSWORD }}",
+            "MONGODB_DATABASE": "${{ vars.MONGODB_DATABASE }}",
+            "MONGODB_USER_COLLECTION": "${{ vars.MONGODB_USER_COLLECTION }}",
+            "MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION": "${{ vars.MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION }}"
           }' > env.dev.json
 
       - uses: serverless/github-action@v3.2
