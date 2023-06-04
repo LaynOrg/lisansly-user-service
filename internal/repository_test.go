@@ -22,13 +22,14 @@ const (
 	TestMongoDbUserName = "root"
 	TestMongoDbPassword = "12345"
 
+	TestMongoDbAmbiguousUri                  = "mongodb://localhost:27017"
 	TestMongoDbDatabaseName                  = "lisansly"
 	TestMongoDbUserCollection                = "user"
 	TestMongoDbRefreshTokenHistoryCollection = "refresh-token-history"
 )
 
 func TestNewRepository(t *testing.T) {
-	userRepository := NewRepository(nil)
+	userRepository := NewRepository(nil, nil)
 
 	assert.Implements(t, (*Repository)(nil), userRepository)
 }
@@ -42,12 +43,28 @@ func TestRepository_InsertUser(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
 					Database: TestMongoDbDatabaseName,
 					Collections: map[string]string{
 						config.MongodbUserCollection: TestMongoDbUserCollection,
@@ -68,9 +85,27 @@ func TestRepository_InsertUser(t *testing.T) {
 
 	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
 		ctx := context.Background()
-		userRepository := NewRepository(&config.Config{})
+		credentials := options.Client().
+			ApplyURI(TestMongoDbAmbiguousUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
 
-		_, err := userRepository.InsertUser(ctx, &UserDocument{
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
+		userRepository := NewRepository(mongoClient, &config.Config{})
+
+		_, err = userRepository.InsertUser(ctx, &UserDocument{
 			Id:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -87,7 +122,26 @@ func TestRepository_InsertUser(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -120,7 +174,26 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -134,10 +207,12 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			},
 		)
 
+		RefreshTokenExpiresAt := time.Now().Add(180 * time.Minute).UTC().Unix()
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
-			Id:     TestRefreshTokenHistoryDocumentId,
-			Token:  TestRefreshToken,
-			UserID: TestUserId,
+			Id:        TestRefreshTokenHistoryDocumentId,
+			UserID:    TestUserId,
+			Token:     TestRefreshToken,
+			ExpiresAt: RefreshTokenExpiresAt,
 		})
 
 		assert.NoError(t, err)
@@ -145,11 +220,32 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 
 	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
 		ctx := context.Background()
-		userRepository := NewRepository(&config.Config{})
+		credentials := options.Client().
+			ApplyURI(TestMongoDbAmbiguousUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
 
-		err := userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
-			Token:  TestRefreshToken,
-			UserID: TestUserId,
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
+		userRepository := NewRepository(mongoClient, &config.Config{})
+
+		RefreshTokenExpiresAt := time.Now().Add(180 * time.Minute).UTC().Unix()
+		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
+			Id:        TestRefreshTokenHistoryDocumentId,
+			UserID:    TestUserId,
+			Token:     TestRefreshToken,
+			ExpiresAt: RefreshTokenExpiresAt,
 		})
 
 		assert.Error(t, err)
@@ -163,7 +259,26 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -177,9 +292,12 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			},
 		)
 
+		RefreshTokenExpiresAt := time.Now().Add(180 * time.Minute).UTC().Unix()
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
-			Token:  TestRefreshToken,
-			UserID: TestUserId,
+			Id:        TestRefreshTokenHistoryDocumentId,
+			UserID:    TestUserId,
+			Token:     TestRefreshToken,
+			ExpiresAt: RefreshTokenExpiresAt,
 		})
 
 		assert.Error(t, err)
@@ -213,7 +331,26 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			})
 		require.NoError(t, err)
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -235,9 +372,27 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 
 	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
 		ctx := context.Background()
-		userRepository := NewRepository(&config.Config{})
+		credentials := options.Client().
+			ApplyURI(TestMongoDbAmbiguousUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
 
-		_, err := userRepository.FindUserWithEmail(ctx, TestEmail)
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
+		userRepository := NewRepository(mongoClient, &config.Config{})
+
+		_, err = userRepository.FindUserWithEmail(ctx, TestEmail)
 
 		assert.Error(t, err)
 	})
@@ -250,7 +405,26 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -278,7 +452,26 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -326,7 +519,26 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 			})
 		require.NoError(t, err)
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -348,9 +560,27 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 
 	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
 		ctx := context.Background()
-		userRepository := NewRepository(&config.Config{})
+		credentials := options.Client().
+			ApplyURI(TestMongoDbAmbiguousUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
 
-		_, err := userRepository.FindUserWithId(ctx, TestEmail)
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
+		userRepository := NewRepository(mongoClient, &config.Config{})
+
+		_, err = userRepository.FindUserWithId(ctx, TestEmail)
 
 		assert.Error(t, err)
 	})
@@ -363,7 +593,26 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -391,7 +640,26 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -439,7 +707,26 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			})
 		require.NoError(t, err)
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -461,9 +748,27 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 
 	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
 		ctx := context.Background()
-		userRepository := NewRepository(&config.Config{})
+		credentials := options.Client().
+			ApplyURI(TestMongoDbAmbiguousUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
 
-		_, err := userRepository.FindRefreshTokenWithUserId(ctx, TestEmail)
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
+		userRepository := NewRepository(mongoClient, &config.Config{})
+
+		_, err = userRepository.FindRefreshTokenWithUserId(ctx, TestEmail)
 
 		assert.Error(t, err)
 	})
@@ -476,7 +781,26 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,
@@ -504,7 +828,26 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		if err != nil {
+			panic(err)
+		}
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			if err != nil {
+				panic(err)
+			}
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
+			mongoClient,
 			&config.Config{
 				Mongodb: config.MongodbConfig{
 					Uri:      mongodbUri,

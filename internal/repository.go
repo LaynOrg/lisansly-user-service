@@ -24,41 +24,32 @@ type Repository interface {
 }
 
 type repository struct {
-	config *config.Config
+	mongoClient *mongo.Client
+	config      *config.Config
 }
 
 func NewRepository(
+	mongoClient *mongo.Client,
 	config *config.Config,
 ) Repository {
 	return &repository{
-		config: config,
+		mongoClient: mongoClient,
+		config:      config,
 	}
 }
 
 func (r *repository) InsertUser(ctx context.Context, user *UserDocument) (string, error) {
-	credentials := options.Client().
-		ApplyURI(r.config.Mongodb.Uri).
-		SetAuth(options.Credential{
-			Username: r.config.Mongodb.Username,
-			Password: r.config.Mongodb.Password,
-		})
-
-	client, err := mongo.Connect(ctx, credentials)
-	if err != nil {
-		return "", cerror.NewError(fiber.StatusInternalServerError, "database connection error", zap.Error(err))
-	}
-	defer client.Disconnect(ctx) //nolint:errcheck
-
-	collection := client.
+	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
-	var foundUser bson.D
+	var foundUser *UserDocument
+
 	filter := bson.D{{"$or", bson.A{
 		bson.D{{"email", user.Email}},
 		bson.D{{"name", user.Name}},
 	}}}
-	err = collection.FindOne(ctx, &filter).Decode(&foundUser)
+	err := collection.FindOne(ctx, &filter).Decode(&foundUser)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return "", cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -67,7 +58,7 @@ func (r *repository) InsertUser(ctx context.Context, user *UserDocument) (string
 		)
 	}
 
-	if len(foundUser) > 0 {
+	if foundUser != nil {
 		return "", cerror.NewError(
 			fiber.StatusConflict,
 			"user already exists",
@@ -98,24 +89,11 @@ func (r *repository) InsertRefreshTokenHistory(
 	ctx context.Context,
 	refreshTokenHistory *RefreshTokenHistoryDocument,
 ) error {
-	credentials := options.Client().
-		ApplyURI(r.config.Mongodb.Uri).
-		SetAuth(options.Credential{
-			Username: r.config.Mongodb.Username,
-			Password: r.config.Mongodb.Password,
-		})
-
-	client, err := mongo.Connect(ctx, credentials)
-	if err != nil {
-		return cerror.NewError(fiber.StatusInternalServerError, "database connection error")
-	}
-	defer client.Disconnect(ctx) //nolint:errcheck
-
-	collection := client.
+	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongoDbRefreshTokenHistoryCollection])
 
-	_, err = collection.InsertOne(ctx, refreshTokenHistory)
+	_, err := collection.InsertOne(ctx, refreshTokenHistory)
 	if err != nil {
 		return cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -128,28 +106,15 @@ func (r *repository) InsertRefreshTokenHistory(
 }
 
 func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*UserDocument, error) {
-	credentials := options.Client().
-		ApplyURI(r.config.Mongodb.Uri).
-		SetAuth(options.Credential{
-			Username: r.config.Mongodb.Username,
-			Password: r.config.Mongodb.Password,
-		})
-
-	client, err := mongo.Connect(ctx, credentials)
-	if err != nil {
-		return nil, cerror.NewError(fiber.StatusInternalServerError, "database connection error")
-	}
-	defer client.Disconnect(ctx) //nolint:errcheck
-
-	collection := client.
+	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
-	var user UserDocument
+	var user *UserDocument
 
 	filter := bson.D{{"email", email}}
-	result := collection.FindOne(ctx, &filter).Decode(&user)
-	if result != nil {
+	err := collection.FindOne(ctx, &filter).Decode(&user)
+	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, cerror.NewError(
 				fiber.StatusNotFound,
@@ -164,32 +129,19 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*User
 		)
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func (r *repository) FindUserWithName(ctx context.Context, name string) (*UserDocument, error) {
-	credentials := options.Client().
-		ApplyURI(r.config.Mongodb.Uri).
-		SetAuth(options.Credential{
-			Username: r.config.Mongodb.Username,
-			Password: r.config.Mongodb.Password,
-		})
-
-	client, err := mongo.Connect(ctx, credentials)
-	if err != nil {
-		return nil, cerror.NewError(fiber.StatusInternalServerError, "database connection error")
-	}
-	defer client.Disconnect(ctx) //nolint:errcheck
-
-	collection := client.
+	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
-	var user UserDocument
+	var user *UserDocument
 
 	filter := bson.D{{"name", name}}
-	result := collection.FindOne(ctx, &filter).Decode(&user)
-	if result != nil {
+	err := collection.FindOne(ctx, &filter).Decode(&user)
+	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, cerror.NewError(
 				fiber.StatusNotFound,
@@ -204,31 +156,18 @@ func (r *repository) FindUserWithName(ctx context.Context, name string) (*UserDo
 		)
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func (r *repository) FindUserWithId(ctx context.Context, userId string) (*UserDocument, error) {
-	credentials := options.Client().
-		ApplyURI(r.config.Mongodb.Uri).
-		SetAuth(options.Credential{
-			Username: r.config.Mongodb.Username,
-			Password: r.config.Mongodb.Password,
-		})
-
-	client, err := mongo.Connect(ctx, credentials)
-	if err != nil {
-		return nil, cerror.NewError(fiber.StatusInternalServerError, "database connection error")
-	}
-	defer client.Disconnect(ctx) //nolint:errcheck
-
-	collection := client.
+	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
-	var user UserDocument
+	var user *UserDocument
 
 	filter := bson.D{{"_id", userId}}
-	err = collection.FindOne(ctx, &filter).Decode(&user)
+	err := collection.FindOne(ctx, &filter).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, cerror.NewError(
@@ -244,34 +183,21 @@ func (r *repository) FindUserWithId(ctx context.Context, userId string) (*UserDo
 		)
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func (r *repository) FindRefreshTokenWithUserId(
 	ctx context.Context, userId string,
 ) (*RefreshTokenHistoryDocument, error) {
-	credentials := options.Client().
-		ApplyURI(r.config.Mongodb.Uri).
-		SetAuth(options.Credential{
-			Username: r.config.Mongodb.Username,
-			Password: r.config.Mongodb.Password,
-		})
-
-	client, err := mongo.Connect(ctx, credentials)
-	if err != nil {
-		return nil, cerror.NewError(fiber.StatusInternalServerError, "database connection error")
-	}
-	defer client.Disconnect(ctx) //nolint:errcheck
-
-	collection := client.
+	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongoDbRefreshTokenHistoryCollection])
 
-	var refreshToken RefreshTokenHistoryDocument
+	var refreshToken *RefreshTokenHistoryDocument
 
 	filter := bson.D{{"userId", userId}}
 	findOneOptions := options.FindOne().SetSort(bson.M{"$natural": -1})
-	err = collection.FindOne(ctx, &filter, findOneOptions).Decode(&refreshToken)
+	err := collection.FindOne(ctx, &filter, findOneOptions).Decode(&refreshToken)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, cerror.NewError(
@@ -287,5 +213,5 @@ func (r *repository) FindRefreshTokenWithUserId(
 		)
 	}
 
-	return &refreshToken, nil
+	return refreshToken, nil
 }

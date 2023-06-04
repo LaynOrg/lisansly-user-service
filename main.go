@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -8,6 +9,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	user "user-api/internal"
 	"user-api/pkg/config"
@@ -43,7 +46,26 @@ func main() {
 		panic(err)
 	}
 
-	userRepository := user.NewRepository(cfg)
+	credentials := options.Client().
+		ApplyURI(cfg.Mongodb.Uri).
+		SetAuth(options.Credential{
+			Username: cfg.Mongodb.Username,
+			Password: cfg.Mongodb.Password,
+		})
+
+	ctx := context.Background()
+	mongoClient, err := mongo.Connect(ctx, credentials)
+	if err != nil {
+		panic(err)
+	}
+	defer func(mongoClient *mongo.Client, ctx context.Context) {
+		err := mongoClient.Disconnect(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}(mongoClient, ctx)
+
+	userRepository := user.NewRepository(mongoClient, cfg)
 	userService := user.NewService(userRepository, jwtFactory)
 	userHandler := user.NewHandler(userService)
 
