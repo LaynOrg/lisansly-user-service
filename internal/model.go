@@ -7,7 +7,7 @@ const (
 type UserRegisterPayload struct {
 	Name     string `json:"name" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Password string `json:"password" validate:"required,len=10"`
 }
 
 type UserLoginPayload struct {

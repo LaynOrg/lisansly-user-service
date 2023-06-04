@@ -71,7 +71,7 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 	var err error
 
 	log := logger.FromContext(ctx.Context()).
-		With(zap.String("eventName", "loginWithEmail"))
+		With(zap.String("eventName", "login"))
 	logger.InjectContext(ctx.Context(), log)
 
 	identifier := ctx.Params("identifier")

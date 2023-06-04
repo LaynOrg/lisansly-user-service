@@ -22,9 +22,12 @@ import (
 )
 
 const (
-	TestInvalidMail  = "invalid-mail.com"
-	TestRefreshToken = "abcd.abcd.abcd"
-	TestAccessToken  = "abcd.abcd.abcd"
+	TestUserName = "Lynicis"
+	TestEmail    = "test@test.com"
+	TestPassword = "12345678910"
+
+	TestInvalidMail     = "invalid-mail.com"
+	TestInvalidPassword = "123"
 )
 
 func TestNewHandler(t *testing.T) {
@@ -81,26 +84,51 @@ func TestHandler_Register(t *testing.T) {
 	})
 
 	t.Run("when validator cant validate payload struct should return error", func(t *testing.T) {
-		TestUserModel := UserRegisterPayload{
-			Email:    TestInvalidMail,
-			Password: TestPassword,
-		}
+		t.Run("invalid email", func(t *testing.T) {
+			TestUserModel := UserRegisterPayload{
+				Email:    TestInvalidMail,
+				Password: TestPassword,
+			}
 
-		app := fiber.New(fiber.Config{
-			ErrorHandler: cerror.Middleware,
+			app := fiber.New(fiber.Config{
+				ErrorHandler: cerror.Middleware,
+			})
+
+			userHandler := NewHandler(nil)
+			userHandler.RegisterRoutes(app)
+
+			reqBody, err := json.Marshal(&TestUserModel)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(fiber.MethodPost, "/user", bytes.NewReader(reqBody))
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+			resp, _ := app.Test(req)
+
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 		})
 
-		userHandler := NewHandler(nil)
-		userHandler.RegisterRoutes(app)
+		t.Run("invalid password", func(t *testing.T) {
+			TestUserModel := UserRegisterPayload{
+				Email:    TestEmail,
+				Password: TestInvalidPassword,
+			}
 
-		reqBody, err := json.Marshal(&TestUserModel)
-		require.NoError(t, err)
+			app := fiber.New(fiber.Config{
+				ErrorHandler: cerror.Middleware,
+			})
 
-		req := httptest.NewRequest(fiber.MethodPost, "/user", bytes.NewReader(reqBody))
-		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-		resp, _ := app.Test(req)
+			userHandler := NewHandler(nil)
+			userHandler.RegisterRoutes(app)
 
-		assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+			reqBody, err := json.Marshal(&TestUserModel)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(fiber.MethodPost, "/user", bytes.NewReader(reqBody))
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+			resp, _ := app.Test(req)
+
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+		})
 	})
 
 	t.Run("when user service return error should return it", func(t *testing.T) {

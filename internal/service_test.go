@@ -57,13 +57,11 @@ mwIDAQAB
 -----END PUBLIC KEY-----`)
 
 const (
-	TestUserId            = "abcd-abcd-abcd-abcd-abcd"
-	TestUserName          = "Lynicis"
-	TestEmail             = "test@test.com"
-	TestPassword          = "12345"
-	TestEncryptedPassword = "$2a$10$aoVeJWgCZe6sueOO3wEIQOoZA3DbolyP6aTTMgmcbsmC3MojKdFme\n"
-
+	TestUserId                        = "abcd-abcd-abcd-abcd-abcd"
+	TestEncryptedPassword             = "$2a$10$aoVeJWgCZe6sueOO3wEIQOoZA3DbolyP6aTTMgmcbsmC3MojKdFme\n"
 	TestRefreshTokenHistoryDocumentId = "abcd-abcd-abcd-abcd"
+	TestRefreshToken                  = "abcd.abcd.abcd"
+	TestAccessToken                   = "abcd.abcd.abcd"
 )
 
 func TestNewService(t *testing.T) {
