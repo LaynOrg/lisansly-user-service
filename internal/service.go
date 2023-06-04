@@ -82,6 +82,7 @@ func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt
 
 	refreshTokenExpiresAtUnix := refreshTokenExpiresAt.UTC().Unix()
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
+		Id:        uuid.New().String(),
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAtUnix,
 		UserID:    userId,
@@ -152,6 +153,7 @@ func (s *service) Login(
 
 	refreshTokenExpiresAtUnix := refreshTokenExpiresAt.UTC().Unix()
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
+		Id:        uuid.New().String(),
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAtUnix,
 		UserID:    user.Id,
