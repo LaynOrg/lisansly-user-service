@@ -80,6 +80,8 @@ func main() {
 		return ctx.Status(fiber.StatusOK).SendString("OK")
 	})
 
+	srv.RegisterRoutes()
+
 	if isAtRemote == "" {
 		err = srv.Start()
 		if err != nil {

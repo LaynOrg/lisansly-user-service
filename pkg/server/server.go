@@ -63,8 +63,6 @@ func (server *server) Start() error {
 		_ = server.fiber.Shutdown()
 	}()
 
-	server.RegisterRoutes()
-
 	serverAddress := fmt.Sprintf(":%s", server.serverPort)
 	return server.fiber.Listen(serverAddress)
 }
