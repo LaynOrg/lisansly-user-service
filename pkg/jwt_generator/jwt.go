@@ -8,7 +8,7 @@ import (
 )
 
 type JwtGenerator interface {
-	GenerateToken(expirationTime time.Time, email, userId string) (string, error)
+	GenerateToken(expirationTime time.Time, name, email, userId string) (string, error)
 }
 
 type jwtGenerator struct {
@@ -23,9 +23,10 @@ func NewJwtGenerator(secretKey []byte) (JwtGenerator, error) {
 
 func (jwtGenerator *jwtGenerator) GenerateToken(
 	expirationTime time.Time,
-	email, userId string,
+	name, email, userId string,
 ) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+		Name:  name,
 		Email: email,
 		Role:  RoleUser,
 		RegisteredClaims: jwt.RegisteredClaims{

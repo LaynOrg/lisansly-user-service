@@ -135,7 +135,7 @@ func TestService_Register(t *testing.T) {
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateToken(gomock.Any(), TestEmail, TestUserId).
+			GenerateToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
@@ -160,12 +160,12 @@ func TestService_Register(t *testing.T) {
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateToken(gomock.Any(), TestEmail, TestUserId).
+			GenerateToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
 			Return(TestAccessToken, nil)
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateToken(gomock.Any(), TestEmail, TestUserId).
+			GenerateToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
@@ -335,7 +335,7 @@ func TestService_Login(t *testing.T) {
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateToken(gomock.Any(), TestEmail, TestUserId).
+			GenerateToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
@@ -365,12 +365,12 @@ func TestService_Login(t *testing.T) {
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateToken(gomock.Any(), TestEmail, TestUserId).
+			GenerateToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
 			Return(TestAccessToken, nil)
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateToken(gomock.Any(), TestEmail, TestUserId).
+			GenerateToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
@@ -567,7 +567,7 @@ func TestService_GetAccessToken(t *testing.T) {
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateToken(gomock.Any(), TestEmail, TestUserId).
+			GenerateToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)

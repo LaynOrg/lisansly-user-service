@@ -35,16 +35,16 @@ func (m *MockJwtGenerator) EXPECT() *MockJwtGeneratorMockRecorder {
 }
 
 // GenerateToken mocks base method.
-func (m *MockJwtGenerator) GenerateToken(expirationTime time.Time, email, userId string) (string, error) {
+func (m *MockJwtGenerator) GenerateToken(expirationTime time.Time, name, email, userId string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateToken", expirationTime, email, userId)
+	ret := m.ctrl.Call(m, "GenerateToken", expirationTime, name, email, userId)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateToken indicates an expected call of GenerateToken.
-func (mr *MockJwtGeneratorMockRecorder) GenerateToken(expirationTime, email, userId interface{}) *gomock.Call {
+func (mr *MockJwtGeneratorMockRecorder) GenerateToken(expirationTime, name, email, userId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateToken", reflect.TypeOf((*MockJwtGenerator)(nil).GenerateToken), expirationTime, email, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateToken", reflect.TypeOf((*MockJwtGenerator)(nil).GenerateToken), expirationTime, name, email, userId)
 }

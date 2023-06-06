@@ -60,7 +60,7 @@ func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt
 
 	var accessToken string
 	accessTokenExpiresAt := time.Now().Add(10 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, userId)
+	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Name, user.Email, userId)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -71,7 +71,7 @@ func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().Add(168 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Email, userId)
+	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Name, user.Email, userId)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -131,7 +131,7 @@ func (s *service) Login(
 
 	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, user.Id)
+	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -142,7 +142,7 @@ func (s *service) Login(
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(168 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Email, user.Id)
+	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -201,7 +201,7 @@ func (s *service) GetAccessToken(ctx context.Context, userId, refreshToken strin
 
 	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Email, user.Id)
+	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
 		return "", cerror.NewError(
 			fiber.StatusInternalServerError,
