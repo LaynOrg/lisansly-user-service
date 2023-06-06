@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-playground/validator"
@@ -48,6 +49,7 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 
 	validate := validator.New()
 	err = validate.Struct(user)
+	fmt.Println(err)
 	if err != nil {
 		return cerror.NewError(
 			fiber.StatusBadRequest,

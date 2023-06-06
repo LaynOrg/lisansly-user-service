@@ -58,7 +58,7 @@ mwIDAQAB
 
 const (
 	TestUserId                        = "abcd-abcd-abcd-abcd-abcd"
-	TestEncryptedPassword             = "$2a$10$aoVeJWgCZe6sueOO3wEIQOoZA3DbolyP6aTTMgmcbsmC3MojKdFme\n"
+	TestCryptPassword                 = "$2a$07$21Py6b8E1XWLlpSS1ASxK.RhNpvm1n3q34G9uqysCwx/ciP0vSaEm\n"
 	TestRefreshTokenHistoryDocumentId = "abcd-abcd-abcd-abcd"
 	TestRefreshToken                  = "abcd.abcd.abcd"
 	TestAccessToken                   = "abcd.abcd.abcd"
@@ -92,6 +92,7 @@ func TestService_Register(t *testing.T) {
 
 		userService := NewService(mockUserRepository, jwtGenerator)
 		tokens, err := userService.Register(ctx, &UserRegisterPayload{
+			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -114,6 +115,7 @@ func TestService_Register(t *testing.T) {
 
 		userService := NewService(mockUserRepository, nil)
 		_, err := userService.Register(ctx, &UserRegisterPayload{
+			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -138,6 +140,7 @@ func TestService_Register(t *testing.T) {
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
 		_, err := userService.Register(ctx, &UserRegisterPayload{
+			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -167,6 +170,7 @@ func TestService_Register(t *testing.T) {
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
 		_, err := userService.Register(ctx, &UserRegisterPayload{
+			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -192,6 +196,7 @@ func TestService_Register(t *testing.T) {
 
 		userService := NewService(mockUserRepository, jwtGenerator)
 		_, err = userService.Register(ctx, &UserRegisterPayload{
+			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -205,35 +210,71 @@ func TestService_Login(t *testing.T) {
 	defer mockController.Finish()
 
 	t.Run("happy path", func(t *testing.T) {
-		ctx := context.Background()
-		mockUserRepository := NewMockRepository(mockController)
-		mockUserRepository.
-			EXPECT().
-			FindUserWithEmail(ctx, TestEmail).
-			Return(&UserDocument{
-				Id:       TestUserId,
+		t.Run("email", func(t *testing.T) {
+			ctx := context.Background()
+			mockUserRepository := NewMockRepository(mockController)
+			mockUserRepository.
+				EXPECT().
+				FindUserWithEmail(ctx, TestEmail).
+				Return(&UserDocument{
+					Id:       TestUserId,
+					Name:     TestUserName,
+					Email:    TestEmail,
+					Password: TestCryptPassword,
+					Role:     RoleUser,
+				}, nil)
+
+			mockUserRepository.
+				EXPECT().
+				InsertRefreshTokenHistory(ctx, gomock.Any()).
+				Return(nil)
+
+			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			require.NoError(t, err)
+
+			userService := NewService(mockUserRepository, jwtGenerator)
+			tokens, err := userService.Login(ctx, &UserLoginPayload{
 				Email:    TestEmail,
-				Password: TestEncryptedPassword,
-				Role:     RoleUser,
-			}, nil)
+				Password: TestPassword,
+			})
 
-		mockUserRepository.
-			EXPECT().
-			InsertRefreshTokenHistory(ctx, gomock.Any()).
-			Return(nil)
-
-		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
-		require.NoError(t, err)
-
-		userService := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := userService.Login(ctx, &UserLoginPayload{
-			Email:    TestEmail,
-			Password: TestPassword,
+			assert.NoError(t, err)
+			assert.NotEmpty(t, tokens.AccessToken)
+			assert.NotEmpty(t, tokens.RefreshToken)
 		})
 
-		assert.NoError(t, err)
-		assert.NotEmpty(t, tokens.AccessToken)
-		assert.NotEmpty(t, tokens.RefreshToken)
+		t.Run("username", func(t *testing.T) {
+			ctx := context.Background()
+			mockUserRepository := NewMockRepository(mockController)
+			mockUserRepository.
+				EXPECT().
+				FindUserWithName(ctx, TestUserName).
+				Return(&UserDocument{
+					Id:       TestUserId,
+					Name:     TestUserName,
+					Email:    TestEmail,
+					Password: TestCryptPassword,
+					Role:     RoleUser,
+				}, nil)
+
+			mockUserRepository.
+				EXPECT().
+				InsertRefreshTokenHistory(ctx, gomock.Any()).
+				Return(nil)
+
+			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			require.NoError(t, err)
+
+			userService := NewService(mockUserRepository, jwtGenerator)
+			tokens, err := userService.Login(ctx, &UserLoginPayload{
+				Name:     TestUserName,
+				Password: TestPassword,
+			})
+
+			assert.NoError(t, err)
+			assert.NotEmpty(t, tokens.AccessToken)
+			assert.NotEmpty(t, tokens.RefreshToken)
+		})
 	})
 
 	t.Run("when error occurred while find user should return error", func(t *testing.T) {
@@ -261,6 +302,7 @@ func TestService_Login(t *testing.T) {
 			FindUserWithEmail(ctx, TestEmail).
 			Return(&UserDocument{
 				Id:       TestUserId,
+				Name:     TestUserName,
 				Email:    TestEmail,
 				Password: "",
 				Role:     RoleUser,
@@ -285,8 +327,9 @@ func TestService_Login(t *testing.T) {
 			FindUserWithEmail(ctx, TestEmail).
 			Return(&UserDocument{
 				Id:       TestUserId,
+				Name:     TestUserName,
 				Email:    TestEmail,
-				Password: TestEncryptedPassword,
+				Password: TestCryptPassword,
 				Role:     RoleUser,
 			}, nil)
 
@@ -314,8 +357,9 @@ func TestService_Login(t *testing.T) {
 			FindUserWithEmail(ctx, TestEmail).
 			Return(&UserDocument{
 				Id:       TestUserId,
+				Name:     TestUserName,
 				Email:    TestEmail,
-				Password: TestEncryptedPassword,
+				Password: TestCryptPassword,
 				Role:     RoleUser,
 			}, nil)
 
@@ -346,8 +390,9 @@ func TestService_Login(t *testing.T) {
 			FindUserWithEmail(ctx, TestEmail).
 			Return(&UserDocument{
 				Id:       TestUserId,
+				Name:     TestUserName,
 				Email:    TestEmail,
-				Password: TestEncryptedPassword,
+				Password: TestCryptPassword,
 				Role:     RoleUser,
 			}, nil)
 
@@ -392,6 +437,7 @@ func TestService_GetAccessToken(t *testing.T) {
 			FindUserWithId(ctx, TestUserId).
 			Return(&UserDocument{
 				Id:        TestUserId,
+				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
 				Role:      RoleUser,
@@ -512,6 +558,7 @@ func TestService_GetAccessToken(t *testing.T) {
 			FindUserWithId(ctx, TestUserId).
 			Return(&UserDocument{
 				Id:        TestUserId,
+				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
 				Role:      RoleUser,

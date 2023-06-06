@@ -38,8 +38,8 @@ func TestNewHandler(t *testing.T) {
 
 func TestHandler_Register(t *testing.T) {
 	TestUserModel := UserRegisterPayload{
-		Email:    TestEmail,
 		Name:     TestUserName,
+		Email:    TestEmail,
 		Password: TestPassword,
 	}
 
@@ -86,6 +86,7 @@ func TestHandler_Register(t *testing.T) {
 	t.Run("when validator cant validate payload struct should return error", func(t *testing.T) {
 		t.Run("invalid email", func(t *testing.T) {
 			TestUserModel := UserRegisterPayload{
+				Name:     TestUserName,
 				Email:    TestInvalidMail,
 				Password: TestPassword,
 			}
@@ -109,6 +110,7 @@ func TestHandler_Register(t *testing.T) {
 
 		t.Run("invalid password", func(t *testing.T) {
 			TestUserModel := UserRegisterPayload{
+				Name:     TestUserName,
 				Email:    TestEmail,
 				Password: TestInvalidPassword,
 			}
@@ -243,7 +245,7 @@ func TestHandler_Login(t *testing.T) {
 	})
 }
 
-func TestHandler_Token(t *testing.T) {
+func TestHandler_GetAccessToken(t *testing.T) {
 	mockController := gomock.NewController(t)
 	defer mockController.Finish()
 
