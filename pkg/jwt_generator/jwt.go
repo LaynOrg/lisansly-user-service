@@ -1,14 +1,19 @@
 package jwt_generator
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"go.uber.org/zap/zapcore"
+
+	"user-api/pkg/cerror"
 )
 
 type JwtGenerator interface {
 	GenerateToken(expirationTime time.Time, name, email, userId string) (string, error)
+	VerifyToken(rawJwtToken string) (*Claims, error)
 }
 
 type jwtGenerator struct {
@@ -44,4 +49,39 @@ func (jwtGenerator *jwtGenerator) GenerateToken(
 	}
 
 	return signedToken, nil
+}
+
+func (jwtGenerator *jwtGenerator) VerifyToken(rawJwtToken string) (*Claims, error) {
+	var claims *Claims
+
+	jwtToken, err := jwt.ParseWithClaims(rawJwtToken, claims, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := jwtToken.Method.(*jwt.SigningMethodHMAC); !ok {
+		return nil, cerror.NewError(
+			http.StatusUnauthorized,
+			"ambiguous jwt token signing method",
+		).SetSeverity(zapcore.WarnLevel)
+	}
+
+	isValidIssuer := claims.VerifyIssuer(IssuerDefault, true)
+	if !isValidIssuer {
+		return nil, cerror.NewError(
+			http.StatusUnauthorized,
+			"ambiguous jwt token issuer",
+		).SetSeverity(zapcore.WarnLevel)
+	}
+
+	now := time.Now().UTC()
+	isJwtTokenExpired := claims.VerifyExpiresAt(now, true)
+	if !isJwtTokenExpired {
+		return nil, cerror.NewError(
+			http.StatusUnauthorized,
+			"expired jwt token",
+		).SetSeverity(zapcore.WarnLevel)
+	}
+
+	return claims, nil
 }

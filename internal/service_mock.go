@@ -35,19 +35,19 @@ func (m *MockService) EXPECT() *MockServiceMockRecorder {
 	return m.recorder
 }
 
-// GetAccessToken mocks base method.
-func (m *MockService) GetAccessToken(ctx context.Context, userId, refreshToken string) (string, error) {
+// GetAccessTokenByRefreshToken mocks base method.
+func (m *MockService) GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAccessToken", ctx, userId, refreshToken)
+	ret := m.ctrl.Call(m, "GetAccessTokenByRefreshToken", ctx, userId, refreshToken)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetAccessToken indicates an expected call of GetAccessToken.
-func (mr *MockServiceMockRecorder) GetAccessToken(ctx, userId, refreshToken interface{}) *gomock.Call {
+// GetAccessTokenByRefreshToken indicates an expected call of GetAccessTokenByRefreshToken.
+func (mr *MockServiceMockRecorder) GetAccessTokenByRefreshToken(ctx, userId, refreshToken interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccessToken", reflect.TypeOf((*MockService)(nil).GetAccessToken), ctx, userId, refreshToken)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccessTokenByRefreshToken", reflect.TypeOf((*MockService)(nil).GetAccessTokenByRefreshToken), ctx, userId, refreshToken)
 }
 
 // Login mocks base method.
@@ -78,4 +78,18 @@ func (m *MockService) Register(ctx context.Context, user *UserRegisterPayload) (
 func (mr *MockServiceMockRecorder) Register(ctx, user interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockService)(nil).Register), ctx, user)
+}
+
+// VerifyAccessToken mocks base method.
+func (m *MockService) VerifyAccessToken(ctx context.Context, accessToken string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyAccessToken", ctx, accessToken)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyAccessToken indicates an expected call of VerifyAccessToken.
+func (mr *MockServiceMockRecorder) VerifyAccessToken(ctx, accessToken interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyAccessToken", reflect.TypeOf((*MockService)(nil).VerifyAccessToken), ctx, accessToken)
 }

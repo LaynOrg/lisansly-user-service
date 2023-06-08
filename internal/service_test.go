@@ -5,13 +5,18 @@ package user
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
+	"user-api/pkg/cerror"
 	"user-api/pkg/jwt_generator"
 )
 
@@ -414,7 +419,7 @@ func TestService_Login(t *testing.T) {
 	})
 }
 
-func TestService_GetAccessToken(t *testing.T) {
+func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 	mockController := gomock.NewController(t)
 	defer mockController.Finish()
 
@@ -448,7 +453,7 @@ func TestService_GetAccessToken(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		accessToken, err := userService.GetAccessToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
 		assert.NoError(t, err)
 		assert.NotEmpty(t, accessToken)
@@ -464,7 +469,7 @@ func TestService_GetAccessToken(t *testing.T) {
 			Return(nil, errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
 		assert.Error(t, err)
 		assert.Empty(t, accessToken)
@@ -485,7 +490,7 @@ func TestService_GetAccessToken(t *testing.T) {
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
 		assert.Error(t, err)
 		assert.Empty(t, accessToken)
@@ -506,7 +511,7 @@ func TestService_GetAccessToken(t *testing.T) {
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
 		assert.Error(t, err)
 		assert.Empty(t, accessToken)
@@ -532,7 +537,7 @@ func TestService_GetAccessToken(t *testing.T) {
 			Return(nil, errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
 		assert.Error(t, err)
 		assert.Empty(t, accessToken)
@@ -571,9 +576,165 @@ func TestService_GetAccessToken(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		accessToken, err := userService.GetAccessToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
 		assert.Error(t, err)
 		assert.Empty(t, accessToken)
+	})
+}
+
+func TestService_VerifyAccessToken(t *testing.T) {
+	mockController := gomock.NewController(t)
+	defer mockController.Finish()
+
+	t.Run("happy path", func(t *testing.T) {
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+		require.NoError(t, err)
+
+		accessTokenExpireAt := time.Now().UTC().Add(10 * time.Minute)
+		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpireAt, TestUserName, TestEmail, TestUserId)
+		require.NoError(t, err)
+
+		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
+		mockJwtGenerator.
+			EXPECT().
+			VerifyToken(accessToken).
+			Return(&jwt_generator.Claims{
+				Name:  TestUserName,
+				Email: TestEmail,
+				Role:  RoleUser,
+				RegisteredClaims: jwt.RegisteredClaims{
+					ID:        uuid.New().String(),
+					Issuer:    jwt_generator.IssuerDefault,
+					Subject:   TestUserId,
+					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(10 * time.Minute)),
+					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+				},
+			}, nil)
+
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(&UserDocument{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC().Unix(),
+			}, nil)
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, mockJwtGenerator)
+		err = service.VerifyAccessToken(ctx, accessToken)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("when jwt is not valid should return error", func(t *testing.T) {
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+		require.NoError(t, err)
+
+		accessTokenExpiresAt := time.Now().UTC().Add(10 * -time.Minute)
+		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpiresAt, TestUserName, TestEmail, TestUserId)
+		require.NoError(t, err)
+
+		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
+		mockJwtGenerator.
+			EXPECT().
+			VerifyToken(accessToken).
+			Return(nil, cerror.NewError(
+				http.StatusUnauthorized,
+				"expired jwt token",
+			).SetSeverity(zapcore.WarnLevel))
+
+		ctx := context.Background()
+		service := NewService(nil, mockJwtGenerator)
+		err = service.VerifyAccessToken(ctx, accessToken)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("when user can't find by user id should return error", func(t *testing.T) {
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+		require.NoError(t, err)
+
+		accessTokenExpireAt := time.Now().UTC().Add(10 * time.Minute)
+		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpireAt, TestUserName, TestEmail, TestUserId)
+		require.NoError(t, err)
+
+		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
+		mockJwtGenerator.
+			EXPECT().
+			VerifyToken(accessToken).
+			Return(&jwt_generator.Claims{
+				Name:  TestUserName,
+				Email: TestEmail,
+				Role:  RoleUser,
+				RegisteredClaims: jwt.RegisteredClaims{
+					ID:        uuid.New().String(),
+					Issuer:    jwt_generator.IssuerDefault,
+					Subject:   TestUserId,
+					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(10 * time.Minute)),
+					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+				},
+			}, nil)
+
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(nil, cerror.NewError(
+				http.StatusNotFound,
+				"user not found",
+			).SetSeverity(zapcore.WarnLevel))
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, mockJwtGenerator)
+		err = service.VerifyAccessToken(ctx, accessToken)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("when error occurred find user by user id should return error", func(t *testing.T) {
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+		require.NoError(t, err)
+
+		accessTokenExpireAt := time.Now().UTC().Add(10 * time.Minute)
+		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpireAt, TestUserName, TestEmail, TestUserId)
+		require.NoError(t, err)
+
+		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
+		mockJwtGenerator.
+			EXPECT().
+			VerifyToken(accessToken).
+			Return(&jwt_generator.Claims{
+				Name:  TestUserName,
+				Email: TestEmail,
+				Role:  RoleUser,
+				RegisteredClaims: jwt.RegisteredClaims{
+					ID:        uuid.New().String(),
+					Issuer:    jwt_generator.IssuerDefault,
+					Subject:   TestUserId,
+					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(10 * time.Minute)),
+					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+				},
+			}, nil)
+
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(nil, cerror.NewError(
+				http.StatusInternalServerError,
+				"error",
+			))
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, mockJwtGenerator)
+		err = service.VerifyAccessToken(ctx, accessToken)
+
+		assert.Error(t, err)
 	})
 }

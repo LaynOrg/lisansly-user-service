@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,7 +18,8 @@ import (
 type Service interface {
 	Register(ctx context.Context, user *UserRegisterPayload) (*jwt_generator.Tokens, error)
 	Login(ctx context.Context, user *UserLoginPayload) (*jwt_generator.Tokens, error)
-	GetAccessToken(ctx context.Context, userId, refreshToken string) (string, error)
+	GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (string, error)
+	VerifyAccessToken(ctx context.Context, accessToken string) error
 }
 
 type service struct {
@@ -25,7 +27,10 @@ type service struct {
 	jwtGenerator   jwt_generator.JwtGenerator
 }
 
-func NewService(userRepository Repository, jwtGenerator jwt_generator.JwtGenerator) Service {
+func NewService(
+	userRepository Repository,
+	jwtGenerator jwt_generator.JwtGenerator,
+) Service {
 	return &service{
 		userRepository: userRepository,
 		jwtGenerator:   jwtGenerator,
@@ -168,7 +173,7 @@ func (s *service) Login(
 	}, nil
 }
 
-func (s *service) GetAccessToken(ctx context.Context, userId, refreshToken string) (string, error) {
+func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (string, error) {
 	var err error
 
 	var refreshTokenDocument *RefreshTokenHistoryDocument
@@ -211,4 +216,30 @@ func (s *service) GetAccessToken(ctx context.Context, userId, refreshToken strin
 	}
 
 	return accessToken, nil
+}
+
+func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) error {
+	var err error
+
+	var claims *jwt_generator.Claims
+	claims, err = s.jwtGenerator.VerifyToken(accessToken)
+	if err != nil {
+		return err
+	}
+
+	userId := claims.Subject
+	_, err = s.userRepository.FindUserWithId(ctx, userId)
+	if err != nil {
+		statusCode := err.(cerror.CustomError).Code()
+		if statusCode == http.StatusNotFound {
+			return cerror.NewError(
+				http.StatusUnauthorized,
+				"user not found email in jwt claims",
+			).SetSeverity(zapcore.WarnLevel)
+		}
+
+		return err
+	}
+
+	return nil
 }

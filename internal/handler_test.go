@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
@@ -34,6 +36,90 @@ func TestNewHandler(t *testing.T) {
 	userHandler := NewHandler(nil)
 
 	assert.Implements(t, (*server.Handler)(nil), userHandler)
+}
+
+func TestHandler_AuthenticationMiddleware(t *testing.T) {
+	mockController := gomock.NewController(t)
+	defer mockController.Finish()
+
+	t.Run("happy path", func(t *testing.T) {
+		app := fiber.New()
+
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte(`secret-key`))
+		require.NoError(t, err)
+
+		accessTokenExpireTime := time.Now().UTC().Add(10 * time.Minute)
+		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
+		require.NoError(t, err)
+
+		mockUserService := NewMockService(mockController)
+		mockUserService.
+			EXPECT().
+			VerifyAccessToken(gomock.Any(), accessToken).
+			Return(nil)
+
+		handler := NewHandler(mockUserService)
+		app.Get("/test", handler.AuthenticationMiddleware, func(ctx *fiber.Ctx) error {
+			return ctx.SendStatus(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(fiber.MethodGet, "/test", nil)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+		resp, _ := app.Test(req)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("when Authorization header is empty should return error", func(t *testing.T) {
+		app := fiber.New(fiber.Config{
+			ErrorHandler: cerror.Middleware,
+		})
+
+		handler := NewHandler(nil)
+		app.Get("/test", handler.AuthenticationMiddleware, func(ctx *fiber.Ctx) error {
+			return ctx.SendStatus(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(fiber.MethodGet, "/test", nil)
+		resp, _ := app.Test(req)
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
+
+	t.Run("when user service can't validate access token should return error ", func(t *testing.T) {
+		app := fiber.New(fiber.Config{
+			ErrorHandler: cerror.Middleware,
+		})
+
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte(`secret-key`))
+		require.NoError(t, err)
+
+		accessTokenExpireTime := time.Now().UTC().Add(10 * time.Minute)
+		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
+		require.NoError(t, err)
+
+		mockUserService := NewMockService(mockController)
+		mockUserService.
+			EXPECT().
+			VerifyAccessToken(gomock.Any(), accessToken).
+			Return(
+				cerror.NewError(
+					http.StatusUnauthorized,
+					"access token is not valid",
+				),
+			)
+
+		handler := NewHandler(mockUserService)
+		app.Get("/test", handler.AuthenticationMiddleware, func(ctx *fiber.Ctx) error {
+			return ctx.SendStatus(http.StatusOK)
+		})
+
+		req := httptest.NewRequest(fiber.MethodGet, "/test", nil)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+		resp, _ := app.Test(req)
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
 }
 
 func TestHandler_Register(t *testing.T) {
@@ -245,7 +331,7 @@ func TestHandler_Login(t *testing.T) {
 	})
 }
 
-func TestHandler_GetAccessToken(t *testing.T) {
+func TestHandler_GetAccessTokenByRefreshToken(t *testing.T) {
 	mockController := gomock.NewController(t)
 	defer mockController.Finish()
 
@@ -255,7 +341,7 @@ func TestHandler_GetAccessToken(t *testing.T) {
 		mockUserService := NewMockService(mockController)
 		mockUserService.
 			EXPECT().
-			GetAccessToken(gomock.Any(), TestUserId, TestRefreshToken).
+			GetAccessTokenByRefreshToken(gomock.Any(), TestUserId, TestRefreshToken).
 			Return(TestAccessToken, nil)
 
 		userHandler := NewHandler(mockUserService)
@@ -282,7 +368,7 @@ func TestHandler_GetAccessToken(t *testing.T) {
 		mockUserService := NewMockService(mockController)
 		mockUserService.
 			EXPECT().
-			GetAccessToken(gomock.Any(), TestUserId, TestRefreshToken).
+			GetAccessTokenByRefreshToken(gomock.Any(), TestUserId, TestRefreshToken).
 			Return("", cerror.NewError(fiber.StatusInternalServerError, "something went wrong"))
 
 		userHandler := NewHandler(mockUserService)

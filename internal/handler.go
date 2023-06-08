@@ -1,18 +1,26 @@
 package user
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/go-playground/validator"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"user-api/pkg/cerror"
 	"user-api/pkg/jwt_generator"
 	"user-api/pkg/logger"
 	"user-api/pkg/server"
 )
+
+type Handler interface {
+	server.Handler
+	AuthenticationMiddleware(ctx *fiber.Ctx) error
+	Register(ctx *fiber.Ctx) error
+	Login(ctx *fiber.Ctx) error
+	GetAccessTokenByRefreshToken(ctx *fiber.Ctx) error
+}
 
 type handler struct {
 	userService Service
@@ -21,13 +29,44 @@ type handler struct {
 func (h *handler) RegisterRoutes(app *fiber.App) {
 	app.Post("/user", h.Register)
 	app.Get("/user/identifier/:identifier/password/:password", h.Login)
-	app.Get("/user/:userId/refreshToken/:refreshToken", h.GetAccessToken)
+	app.Get("/user/:userId/refreshToken/:refreshToken", h.GetAccessTokenByRefreshToken)
 }
 
-func NewHandler(userService Service) server.Handler {
+func NewHandler(userService Service) Handler {
 	return &handler{
 		userService: userService,
 	}
+}
+
+func (h *handler) AuthenticationMiddleware(ctx *fiber.Ctx) error {
+	var err error
+
+	log := logger.FromContext(ctx.Context()).
+		With(zap.String("eventName", "authenticationMiddleware"))
+	logger.InjectContext(ctx.Context(), log)
+
+	requestHeaders := ctx.GetReqHeaders()
+
+	authorizationHeader := requestHeaders[fiber.HeaderAuthorization]
+	authorizationHeaderLength := len([]rune(authorizationHeader))
+	if authorizationHeaderLength == 0 {
+		return cerror.NewError(
+			http.StatusUnauthorized,
+			"access token not found in authorization header",
+		).SetSeverity(zapcore.WarnLevel)
+	}
+
+	log.With(zap.String("authorizationHeader", authorizationHeader))
+	logger.InjectContext(ctx.Context(), log)
+
+	accessToken := authorizationHeader[7:authorizationHeaderLength]
+	err = h.userService.VerifyAccessToken(ctx.Context(), accessToken)
+	if err != nil {
+		return err
+	}
+
+	log.Info("event successfully finished")
+	return ctx.Next()
 }
 
 func (h *handler) Register(ctx *fiber.Ctx) error {
@@ -49,7 +88,6 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 
 	validate := validator.New()
 	err = validate.Struct(user)
-	fmt.Println(err)
 	if err != nil {
 		return cerror.NewError(
 			fiber.StatusBadRequest,
@@ -77,6 +115,8 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 	logger.InjectContext(ctx.Context(), log)
 
 	identifier := ctx.Params("identifier")
+	password := ctx.Params("password")
+
 	validate := validator.New()
 	err = validate.Var(identifier, "required,email")
 
@@ -86,7 +126,7 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 	} else {
 		user.Email = identifier
 	}
-	user.Password = ctx.Params("password")
+	user.Password = password
 
 	var tokens *jwt_generator.Tokens
 	tokens, err = h.userService.Login(ctx.Context(), user)
@@ -100,7 +140,7 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 		JSON(tokens)
 }
 
-func (h *handler) GetAccessToken(ctx *fiber.Ctx) error {
+func (h *handler) GetAccessTokenByRefreshToken(ctx *fiber.Ctx) error {
 	var err error
 
 	log := logger.FromContext(ctx.Context()).
@@ -111,7 +151,7 @@ func (h *handler) GetAccessToken(ctx *fiber.Ctx) error {
 	refreshToken := ctx.Params("refreshToken")
 
 	var accessToken string
-	accessToken, err = h.userService.GetAccessToken(ctx.Context(), userId, refreshToken)
+	accessToken, err = h.userService.GetAccessTokenByRefreshToken(ctx.Context(), userId, refreshToken)
 	if err != nil {
 		return err
 	}

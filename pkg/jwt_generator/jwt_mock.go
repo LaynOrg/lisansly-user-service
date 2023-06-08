@@ -48,3 +48,18 @@ func (mr *MockJwtGeneratorMockRecorder) GenerateToken(expirationTime, name, emai
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateToken", reflect.TypeOf((*MockJwtGenerator)(nil).GenerateToken), expirationTime, name, email, userId)
 }
+
+// VerifyToken mocks base method.
+func (m *MockJwtGenerator) VerifyToken(rawJwtToken string) (*Claims, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyToken", rawJwtToken)
+	ret0, _ := ret[0].(*Claims)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// VerifyToken indicates an expected call of VerifyToken.
+func (mr *MockJwtGeneratorMockRecorder) VerifyToken(rawJwtToken interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyToken", reflect.TypeOf((*MockJwtGenerator)(nil).VerifyToken), rawJwtToken)
+}

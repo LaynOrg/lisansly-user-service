@@ -24,7 +24,7 @@ coverage-report:
 	go clean -testcache
 	go test -tags=unit -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out
-	go tool cover -html=coverage.out
+	go tool cover -html=coverage.out -o=coverage.html
 
 generate-mock:
 	mockgen --source=internal/repository.go --destination=internal/repository_mock.go --package=user
