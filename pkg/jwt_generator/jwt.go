@@ -30,6 +30,7 @@ func (jwtGenerator *jwtGenerator) GenerateToken(
 	expirationTime time.Time,
 	name, email, userId string,
 ) (string, error) {
+	issuedAt := time.Now().UTC()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		Name:  name,
 		Email: email,
@@ -38,7 +39,7 @@ func (jwtGenerator *jwtGenerator) GenerateToken(
 			ID:        uuid.New().String(),
 			Subject:   userId,
 			Issuer:    IssuerDefault,
-			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+			IssuedAt:  jwt.NewNumericDate(issuedAt),
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},
 	})

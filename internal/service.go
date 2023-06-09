@@ -16,8 +16,8 @@ import (
 )
 
 type Service interface {
-	Register(ctx context.Context, user *UserRegisterPayload) (*jwt_generator.Tokens, error)
-	Login(ctx context.Context, user *UserLoginPayload) (*jwt_generator.Tokens, error)
+	Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, error)
+	Login(ctx context.Context, user *LoginPayload) (*jwt_generator.Tokens, error)
 	GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (string, error)
 	VerifyAccessToken(ctx context.Context, accessToken string) error
 }
@@ -37,7 +37,7 @@ func NewService(
 	}
 }
 
-func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt_generator.Tokens, error) {
+func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, error) {
 	var err error
 
 	var hashedPassword []byte
@@ -50,21 +50,30 @@ func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt
 		)
 	}
 
+	createdAt := time.Now().UTC()
+	if err != nil {
+		return nil, cerror.NewError(
+			fiber.StatusInternalServerError,
+			"error occurred while time parsing",
+			zap.Error(err),
+		)
+	}
+
 	var userId string
-	userId, err = s.userRepository.InsertUser(ctx, &UserDocument{
+	userId, err = s.userRepository.InsertUser(ctx, &Document{
 		Id:        uuid.New().String(),
 		Name:      user.Name,
 		Email:     user.Email,
 		Password:  string(hashedPassword),
 		Role:      RoleUser,
-		CreatedAt: time.Now().UTC().Unix(),
+		CreatedAt: createdAt,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	var accessToken string
-	accessTokenExpiresAt := time.Now().Add(10 * time.Minute)
+	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
 	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Name, user.Email, userId)
 	if err != nil {
 		return nil, cerror.NewError(
@@ -75,7 +84,7 @@ func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt
 	}
 
 	var refreshToken string
-	refreshTokenExpiresAt := time.Now().Add(168 * time.Hour)
+	refreshTokenExpiresAt := time.Now().UTC().Add(168 * time.Hour)
 	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Name, user.Email, userId)
 	if err != nil {
 		return nil, cerror.NewError(
@@ -85,11 +94,10 @@ func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt
 		)
 	}
 
-	refreshTokenExpiresAtUnix := refreshTokenExpiresAt.UTC().Unix()
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
 		Id:        uuid.New().String(),
 		Token:     refreshToken,
-		ExpiresAt: refreshTokenExpiresAtUnix,
+		ExpiresAt: refreshTokenExpiresAt,
 		UserID:    userId,
 	})
 	if err != nil {
@@ -104,26 +112,19 @@ func (s *service) Register(ctx context.Context, user *UserRegisterPayload) (*jwt
 
 func (s *service) Login(
 	ctx context.Context,
-	claimedUser *UserLoginPayload,
+	claimedUser *LoginPayload,
 ) (
 	*jwt_generator.Tokens,
 	error,
 ) {
 	var (
-		user *UserDocument
+		user *Document
 		err  error
 	)
 
-	if claimedUser.Email != "" {
-		user, err = s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		user, err = s.userRepository.FindUserWithName(ctx, claimedUser.Name)
-		if err != nil {
-			return nil, err
-		}
+	user, err = s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
+	if err != nil {
+		return nil, err
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(claimedUser.Password))
@@ -156,11 +157,10 @@ func (s *service) Login(
 		)
 	}
 
-	refreshTokenExpiresAtUnix := refreshTokenExpiresAt.UTC().Unix()
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
 		Id:        uuid.New().String(),
 		Token:     refreshToken,
-		ExpiresAt: refreshTokenExpiresAtUnix,
+		ExpiresAt: refreshTokenExpiresAt,
 		UserID:    user.Id,
 	})
 	if err != nil {
@@ -189,8 +189,7 @@ func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refr
 		).SetSeverity(zapcore.WarnLevel)
 	}
 
-	refreshTokenExpiresAt := time.Unix(refreshTokenDocument.ExpiresAt, 0)
-	refreshTokenExpire := time.Now().UTC().After(refreshTokenExpiresAt)
+	refreshTokenExpire := time.Now().UTC().After(refreshTokenDocument.ExpiresAt)
 	if refreshTokenExpire {
 		return "", cerror.NewError(
 			fiber.StatusForbidden,
@@ -198,7 +197,7 @@ func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refr
 		).SetSeverity(zapcore.WarnLevel)
 	}
 
-	var user *UserDocument
+	var user *Document
 	user, err = s.userRepository.FindUserWithId(ctx, userId)
 	if err != nil {
 		return "", err

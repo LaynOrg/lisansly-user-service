@@ -15,10 +15,9 @@ import (
 )
 
 type Repository interface {
-	InsertUser(ctx context.Context, user *UserDocument) (string, error)
-	FindUserWithId(ctx context.Context, userId string) (*UserDocument, error)
-	FindUserWithEmail(ctx context.Context, email string) (*UserDocument, error)
-	FindUserWithName(ctx context.Context, name string) (*UserDocument, error)
+	InsertUser(ctx context.Context, user *Document) (string, error)
+	FindUserWithId(ctx context.Context, userId string) (*Document, error)
+	FindUserWithEmail(ctx context.Context, email string) (*Document, error)
 	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryDocument) error
 	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryDocument, error)
 }
@@ -38,17 +37,14 @@ func NewRepository(
 	}
 }
 
-func (r *repository) InsertUser(ctx context.Context, user *UserDocument) (string, error) {
+func (r *repository) InsertUser(ctx context.Context, user *Document) (string, error) {
 	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
-	var foundUser *UserDocument
+	var foundUser *Document
 
-	filter := bson.D{{"$or", bson.A{
-		bson.D{{"email", user.Email}},
-		bson.D{{"name", user.Name}},
-	}}}
+	filter := bson.D{{"email", user.Email}}
 	err := collection.FindOne(ctx, &filter).Decode(&foundUser)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return "", cerror.NewError(
@@ -105,12 +101,12 @@ func (r *repository) InsertRefreshTokenHistory(
 	return nil
 }
 
-func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*UserDocument, error) {
+func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Document, error) {
 	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
-	var user *UserDocument
+	var user *Document
 
 	filter := bson.D{{"email", email}}
 	err := collection.FindOne(ctx, &filter).Decode(&user)
@@ -132,39 +128,12 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*User
 	return user, nil
 }
 
-func (r *repository) FindUserWithName(ctx context.Context, name string) (*UserDocument, error) {
+func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Document, error) {
 	collection := r.mongoClient.
 		Database(r.config.Mongodb.Database).
 		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
 
-	var user *UserDocument
-
-	filter := bson.D{{"name", name}}
-	err := collection.FindOne(ctx, &filter).Decode(&user)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, cerror.NewError(
-				fiber.StatusNotFound,
-				"user not found",
-			).SetSeverity(zapcore.WarnLevel)
-		}
-
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while find user with name",
-			zap.Error(err),
-		)
-	}
-
-	return user, nil
-}
-
-func (r *repository) FindUserWithId(ctx context.Context, userId string) (*UserDocument, error) {
-	collection := r.mongoClient.
-		Database(r.config.Mongodb.Database).
-		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
-
-	var user *UserDocument
+	var user *Document
 
 	filter := bson.D{{"_id", userId}}
 	err := collection.FindOne(ctx, &filter).Decode(&user)

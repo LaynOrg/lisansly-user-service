@@ -96,7 +96,7 @@ func TestService_Register(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := userService.Register(ctx, &UserRegisterPayload{
+		tokens, err := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -119,7 +119,7 @@ func TestService_Register(t *testing.T) {
 			)
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Register(ctx, &UserRegisterPayload{
+		_, err := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -144,7 +144,7 @@ func TestService_Register(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Register(ctx, &UserRegisterPayload{
+		_, err := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -174,7 +174,7 @@ func TestService_Register(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Register(ctx, &UserRegisterPayload{
+		_, err := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -200,7 +200,7 @@ func TestService_Register(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		_, err = userService.Register(ctx, &UserRegisterPayload{
+		_, err = userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -215,71 +215,36 @@ func TestService_Login(t *testing.T) {
 	defer mockController.Finish()
 
 	t.Run("happy path", func(t *testing.T) {
-		t.Run("email", func(t *testing.T) {
-			ctx := context.Background()
-			mockUserRepository := NewMockRepository(mockController)
-			mockUserRepository.
-				EXPECT().
-				FindUserWithEmail(ctx, TestEmail).
-				Return(&UserDocument{
-					Id:       TestUserId,
-					Name:     TestUserName,
-					Email:    TestEmail,
-					Password: TestCryptPassword,
-					Role:     RoleUser,
-				}, nil)
-
-			mockUserRepository.
-				EXPECT().
-				InsertRefreshTokenHistory(ctx, gomock.Any()).
-				Return(nil)
-
-			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
-			require.NoError(t, err)
-
-			userService := NewService(mockUserRepository, jwtGenerator)
-			tokens, err := userService.Login(ctx, &UserLoginPayload{
-				Email:    TestEmail,
-				Password: TestPassword,
-			})
-
-			assert.NoError(t, err)
-			assert.NotEmpty(t, tokens.AccessToken)
-			assert.NotEmpty(t, tokens.RefreshToken)
-		})
-
-		t.Run("username", func(t *testing.T) {
-			ctx := context.Background()
-			mockUserRepository := NewMockRepository(mockController)
-			mockUserRepository.
-				EXPECT().
-				FindUserWithName(ctx, TestUserName).
-				Return(&UserDocument{
-					Id:       TestUserId,
-					Name:     TestUserName,
-					Email:    TestEmail,
-					Password: TestCryptPassword,
-					Role:     RoleUser,
-				}, nil)
-
-			mockUserRepository.
-				EXPECT().
-				InsertRefreshTokenHistory(ctx, gomock.Any()).
-				Return(nil)
-
-			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
-			require.NoError(t, err)
-
-			userService := NewService(mockUserRepository, jwtGenerator)
-			tokens, err := userService.Login(ctx, &UserLoginPayload{
+		ctx := context.Background()
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithEmail(ctx, TestEmail).
+			Return(&Document{
+				Id:       TestUserId,
 				Name:     TestUserName,
-				Password: TestPassword,
-			})
+				Email:    TestEmail,
+				Password: TestCryptPassword,
+				Role:     RoleUser,
+			}, nil)
 
-			assert.NoError(t, err)
-			assert.NotEmpty(t, tokens.AccessToken)
-			assert.NotEmpty(t, tokens.RefreshToken)
+		mockUserRepository.
+			EXPECT().
+			InsertRefreshTokenHistory(ctx, gomock.Any()).
+			Return(nil)
+
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+		require.NoError(t, err)
+
+		userService := NewService(mockUserRepository, jwtGenerator)
+		tokens, err := userService.Login(ctx, &LoginPayload{
+			Email:    TestEmail,
+			Password: TestPassword,
 		})
+
+		assert.NoError(t, err)
+		assert.NotEmpty(t, tokens.AccessToken)
+		assert.NotEmpty(t, tokens.RefreshToken)
 	})
 
 	t.Run("when error occurred while find user should return error", func(t *testing.T) {
@@ -291,7 +256,7 @@ func TestService_Login(t *testing.T) {
 			Return(nil, errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Login(ctx, &UserLoginPayload{
+		_, err := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -305,7 +270,7 @@ func TestService_Login(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithEmail(ctx, TestEmail).
-			Return(&UserDocument{
+			Return(&Document{
 				Id:       TestUserId,
 				Name:     TestUserName,
 				Email:    TestEmail,
@@ -314,7 +279,7 @@ func TestService_Login(t *testing.T) {
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Login(ctx, &UserLoginPayload{
+		_, err := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -330,7 +295,7 @@ func TestService_Login(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithEmail(ctx, TestEmail).
-			Return(&UserDocument{
+			Return(&Document{
 				Id:       TestUserId,
 				Name:     TestUserName,
 				Email:    TestEmail,
@@ -344,7 +309,7 @@ func TestService_Login(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Login(ctx, &UserLoginPayload{
+		_, err := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -360,7 +325,7 @@ func TestService_Login(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithEmail(ctx, TestEmail).
-			Return(&UserDocument{
+			Return(&Document{
 				Id:       TestUserId,
 				Name:     TestUserName,
 				Email:    TestEmail,
@@ -379,7 +344,7 @@ func TestService_Login(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Login(ctx, &UserLoginPayload{
+		_, err := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -393,7 +358,7 @@ func TestService_Login(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithEmail(ctx, TestEmail).
-			Return(&UserDocument{
+			Return(&Document{
 				Id:       TestUserId,
 				Name:     TestUserName,
 				Email:    TestEmail,
@@ -410,7 +375,7 @@ func TestService_Login(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		_, err = userService.Login(ctx, &UserLoginPayload{
+		_, err = userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -433,20 +398,20 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			Return(&RefreshTokenHistoryDocument{
 				Id:        TestRefreshTokenHistoryDocumentId,
 				Token:     TestRefreshToken,
-				ExpiresAt: time.Now().UTC().Add(10 * time.Minute).Unix(),
+				ExpiresAt: time.Now().UTC().Add(10 * time.Minute),
 				UserID:    TestUserId,
 			}, nil)
 
 		mockUserRepository.
 			EXPECT().
 			FindUserWithId(ctx, TestUserId).
-			Return(&UserDocument{
+			Return(&Document{
 				Id:        TestUserId,
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
 				Role:      RoleUser,
-				CreatedAt: time.Now().UTC().Unix(),
+				CreatedAt: time.Now().UTC(),
 			}, nil)
 
 		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret"))
@@ -485,7 +450,7 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			Return(&RefreshTokenHistoryDocument{
 				Id:        TestRefreshTokenHistoryDocumentId,
 				Token:     "wrong-refresh-token",
-				ExpiresAt: time.Now().UTC().Add(10 * time.Minute).Unix(),
+				ExpiresAt: time.Now().UTC().Add(10 * time.Minute),
 				UserID:    TestUserId,
 			}, nil)
 
@@ -506,7 +471,7 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			Return(&RefreshTokenHistoryDocument{
 				Id:        TestRefreshTokenHistoryDocumentId,
 				Token:     TestRefreshToken,
-				ExpiresAt: 0,
+				ExpiresAt: time.Now().UTC().Add(-10 * time.Minute),
 				UserID:    TestUserId,
 			}, nil)
 
@@ -527,7 +492,7 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			Return(&RefreshTokenHistoryDocument{
 				Id:        TestRefreshTokenHistoryDocumentId,
 				Token:     TestRefreshToken,
-				ExpiresAt: time.Now().UTC().Add(10 * time.Minute).Unix(),
+				ExpiresAt: time.Now().UTC().Add(10 * time.Minute),
 				UserID:    TestUserId,
 			}, nil)
 
@@ -554,20 +519,20 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			Return(&RefreshTokenHistoryDocument{
 				Id:        TestRefreshTokenHistoryDocumentId,
 				Token:     TestRefreshToken,
-				ExpiresAt: time.Now().UTC().Add(10 * time.Minute).Unix(),
+				ExpiresAt: time.Now().UTC().Add(10 * time.Minute),
 				UserID:    TestUserId,
 			}, nil)
 
 		mockUserRepository.
 			EXPECT().
 			FindUserWithId(ctx, TestUserId).
-			Return(&UserDocument{
+			Return(&Document{
 				Id:        TestUserId,
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
 				Role:      RoleUser,
-				CreatedAt: time.Now().UTC().Unix(),
+				CreatedAt: time.Now().UTC(),
 			}, nil)
 
 		mockJwtGenerator.
@@ -616,13 +581,13 @@ func TestService_VerifyAccessToken(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithId(gomock.Any(), TestUserId).
-			Return(&UserDocument{
+			Return(&Document{
 				Id:        TestUserId,
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
 				Role:      RoleUser,
-				CreatedAt: time.Now().UTC().Unix(),
+				CreatedAt: time.Now().UTC(),
 			}, nil)
 
 		ctx := context.Background()

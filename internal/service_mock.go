@@ -51,7 +51,7 @@ func (mr *MockServiceMockRecorder) GetAccessTokenByRefreshToken(ctx, userId, ref
 }
 
 // Login mocks base method.
-func (m *MockService) Login(ctx context.Context, user *UserLoginPayload) (*jwt_generator.Tokens, error) {
+func (m *MockService) Login(ctx context.Context, user *LoginPayload) (*jwt_generator.Tokens, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Login", ctx, user)
 	ret0, _ := ret[0].(*jwt_generator.Tokens)
@@ -66,7 +66,7 @@ func (mr *MockServiceMockRecorder) Login(ctx, user interface{}) *gomock.Call {
 }
 
 // Register mocks base method.
-func (m *MockService) Register(ctx context.Context, user *UserRegisterPayload) (*jwt_generator.Tokens, error) {
+func (m *MockService) Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, user)
 	ret0, _ := ret[0].(*jwt_generator.Tokens)

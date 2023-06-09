@@ -73,7 +73,7 @@ func TestRepository_InsertUser(t *testing.T) {
 			},
 		)
 
-		userId, err := userRepository.InsertUser(ctx, &UserDocument{
+		userId, err := userRepository.InsertUser(ctx, &Document{
 			Id:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -105,7 +105,7 @@ func TestRepository_InsertUser(t *testing.T) {
 
 		userRepository := NewRepository(mongoClient, &config.Config{})
 
-		_, err = userRepository.InsertUser(ctx, &UserDocument{
+		_, err = userRepository.InsertUser(ctx, &Document{
 			Id:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -155,7 +155,7 @@ func TestRepository_InsertUser(t *testing.T) {
 			},
 		)
 
-		_, err = userRepository.InsertUser(ctx, &UserDocument{
+		_, err = userRepository.InsertUser(ctx, &Document{
 			Id:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -207,7 +207,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			},
 		)
 
-		RefreshTokenExpiresAt := time.Now().Add(180 * time.Minute).UTC().Unix()
+		RefreshTokenExpiresAt := time.Now().UTC().Add(180 * time.Minute)
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
 			Id:        TestRefreshTokenHistoryDocumentId,
 			UserID:    TestUserId,
@@ -240,7 +240,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 
 		userRepository := NewRepository(mongoClient, &config.Config{})
 
-		RefreshTokenExpiresAt := time.Now().Add(180 * time.Minute).UTC().Unix()
+		RefreshTokenExpiresAt := time.Now().UTC().Add(180 * time.Minute)
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
 			Id:        TestRefreshTokenHistoryDocumentId,
 			UserID:    TestUserId,
@@ -292,7 +292,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			},
 		)
 
-		RefreshTokenExpiresAt := time.Now().Add(180 * time.Minute).UTC().Unix()
+		RefreshTokenExpiresAt := time.Now().UTC().Add(180 * time.Minute)
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
 			Id:        TestRefreshTokenHistoryDocumentId,
 			UserID:    TestUserId,
@@ -324,7 +324,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		_, err = client.
 			Database(TestMongoDbDatabaseName).
 			Collection(TestMongoDbUserCollection).
-			InsertOne(ctx, &UserDocument{
+			InsertOne(ctx, &Document{
 				Email:    TestEmail,
 				Password: TestPassword,
 				Role:     RoleUser,
@@ -511,7 +511,7 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 		_, err = client.
 			Database(TestMongoDbDatabaseName).
 			Collection(TestMongoDbUserCollection).
-			InsertOne(ctx, &UserDocument{
+			InsertOne(ctx, &Document{
 				Id:       TestUserId,
 				Email:    TestEmail,
 				Password: TestPassword,
@@ -702,7 +702,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			InsertOne(ctx, &RefreshTokenHistoryDocument{
 				Id:        TestRefreshTokenHistoryDocumentId,
 				Token:     TestRefreshToken,
-				ExpiresAt: time.Now().Add(10 * time.Minute).UTC().Unix(),
+				ExpiresAt: time.Now().Add(10 * time.Minute).UTC(),
 				UserID:    TestUserId,
 			})
 		require.NoError(t, err)

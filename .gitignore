@@ -9,6 +9,7 @@ yarn-error.log
 user-api
 coverage.out
 coverage.out.tmp
+coverage.html
 tmp/
 .yarn/
 env.*.json

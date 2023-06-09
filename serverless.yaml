@@ -27,7 +27,7 @@ functions:
           cors: true
       - http:
           method: GET
-          path: /user/identifier/{userIdentifier}/password/{userPassword}
+          path: /user/email/{userEmail}/password/{userPassword}
           cors: true
       - http:
           method: GET

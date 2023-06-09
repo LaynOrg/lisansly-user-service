@@ -1,8 +1,8 @@
 {
-  "name": "auth-api",
+  "name": "user-api",
   "version": "1.0.0",
   "main": "main.go",
-  "repository": "git@github.com:Lisansly/auth-api.git",
+  "repository": "git@github.com:Lisansly/user-api.git",
   "author": "Lisansly",
   "license": "MIT",
   "devDependencies": {

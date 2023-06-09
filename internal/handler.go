@@ -28,7 +28,7 @@ type handler struct {
 
 func (h *handler) RegisterRoutes(app *fiber.App) {
 	app.Post("/user", h.Register)
-	app.Get("/user/identifier/:identifier/password/:password", h.Login)
+	app.Get("/user/email/:email/password/:password", h.Login)
 	app.Get("/user/:userId/refreshToken/:refreshToken", h.GetAccessTokenByRefreshToken)
 }
 
@@ -76,7 +76,7 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 		With(zap.String("eventName", "register"))
 	logger.InjectContext(ctx.Context(), log)
 
-	var user *UserRegisterPayload
+	var user *RegisterPayload
 	err = ctx.BodyParser(&user)
 	if err != nil {
 		return cerror.NewError(
@@ -114,19 +114,16 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 		With(zap.String("eventName", "login"))
 	logger.InjectContext(ctx.Context(), log)
 
-	identifier := ctx.Params("identifier")
+	email := ctx.Params("email")
 	password := ctx.Params("password")
 
 	validate := validator.New()
-	err = validate.Var(identifier, "required,email")
+	err = validate.Var(email, "email")
 
-	user := &UserLoginPayload{}
-	if err != nil {
-		user.Name = identifier
-	} else {
-		user.Email = identifier
+	user := &LoginPayload{
+		Email:    email,
+		Password: password,
 	}
-	user.Password = password
 
 	var tokens *jwt_generator.Tokens
 	tokens, err = h.userService.Login(ctx.Context(), user)

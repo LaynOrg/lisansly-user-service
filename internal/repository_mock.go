@@ -50,10 +50,10 @@ func (mr *MockRepositoryMockRecorder) FindRefreshTokenWithUserId(ctx, userId int
 }
 
 // FindUserWithEmail mocks base method.
-func (m *MockRepository) FindUserWithEmail(ctx context.Context, email string) (*UserDocument, error) {
+func (m *MockRepository) FindUserWithEmail(ctx context.Context, email string) (*Document, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindUserWithEmail", ctx, email)
-	ret0, _ := ret[0].(*UserDocument)
+	ret0, _ := ret[0].(*Document)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -65,10 +65,10 @@ func (mr *MockRepositoryMockRecorder) FindUserWithEmail(ctx, email interface{}) 
 }
 
 // FindUserWithId mocks base method.
-func (m *MockRepository) FindUserWithId(ctx context.Context, userId string) (*UserDocument, error) {
+func (m *MockRepository) FindUserWithId(ctx context.Context, userId string) (*Document, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindUserWithId", ctx, userId)
-	ret0, _ := ret[0].(*UserDocument)
+	ret0, _ := ret[0].(*Document)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -77,21 +77,6 @@ func (m *MockRepository) FindUserWithId(ctx context.Context, userId string) (*Us
 func (mr *MockRepositoryMockRecorder) FindUserWithId(ctx, userId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUserWithId", reflect.TypeOf((*MockRepository)(nil).FindUserWithId), ctx, userId)
-}
-
-// FindUserWithName mocks base method.
-func (m *MockRepository) FindUserWithName(ctx context.Context, name string) (*UserDocument, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindUserWithName", ctx, name)
-	ret0, _ := ret[0].(*UserDocument)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FindUserWithName indicates an expected call of FindUserWithName.
-func (mr *MockRepositoryMockRecorder) FindUserWithName(ctx, name interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUserWithName", reflect.TypeOf((*MockRepository)(nil).FindUserWithName), ctx, name)
 }
 
 // InsertRefreshTokenHistory mocks base method.
@@ -109,7 +94,7 @@ func (mr *MockRepositoryMockRecorder) InsertRefreshTokenHistory(ctx, refreshToke
 }
 
 // InsertUser mocks base method.
-func (m *MockRepository) InsertUser(ctx context.Context, user *UserDocument) (string, error) {
+func (m *MockRepository) InsertUser(ctx context.Context, user *Document) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertUser", ctx, user)
 	ret0, _ := ret[0].(string)
