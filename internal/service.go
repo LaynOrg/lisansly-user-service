@@ -223,7 +223,10 @@ func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) err
 	var claims *jwt_generator.Claims
 	claims, err = s.jwtGenerator.VerifyToken(accessToken)
 	if err != nil {
-		return err
+		return cerror.NewError(
+			http.StatusUnauthorized,
+			err.Error(),
+		).SetSeverity(zapcore.WarnLevel)
 	}
 
 	userId := claims.Subject

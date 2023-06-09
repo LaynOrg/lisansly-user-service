@@ -1,14 +1,11 @@
 package jwt_generator
 
 import (
-	"net/http"
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-	"go.uber.org/zap/zapcore"
-
-	"user-api/pkg/cerror"
 )
 
 type JwtGenerator interface {
@@ -61,27 +58,18 @@ func (jwtGenerator *jwtGenerator) VerifyToken(rawJwtToken string) (*Claims, erro
 	}
 
 	if _, ok := jwtToken.Method.(*jwt.SigningMethodHMAC); !ok {
-		return nil, cerror.NewError(
-			http.StatusUnauthorized,
-			"ambiguous jwt token signing method",
-		).SetSeverity(zapcore.WarnLevel)
+		return nil, errors.New("ambiguous jwt token signing method")
 	}
 
 	isValidIssuer := claims.VerifyIssuer(IssuerDefault, true)
 	if !isValidIssuer {
-		return nil, cerror.NewError(
-			http.StatusUnauthorized,
-			"ambiguous jwt token issuer",
-		).SetSeverity(zapcore.WarnLevel)
+		return nil, errors.New("ambiguous jwt token issuer")
 	}
 
 	now := time.Now().UTC()
 	isJwtTokenExpired := claims.VerifyExpiresAt(now, true)
 	if !isJwtTokenExpired {
-		return nil, cerror.NewError(
-			http.StatusUnauthorized,
-			"expired jwt token",
-		).SetSeverity(zapcore.WarnLevel)
+		return nil, errors.New("expired jwt token")
 	}
 
 	return claims, nil
