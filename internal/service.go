@@ -130,7 +130,7 @@ func (s *service) Login(
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(claimedUser.Password))
 	if err != nil {
 		return nil, cerror.NewError(
-			fiber.StatusForbidden,
+			fiber.StatusUnauthorized,
 			"error occurred while compare passwords",
 		)
 	}
