@@ -124,6 +124,13 @@ func (s *service) Login(
 
 	user, err = s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
 	if err != nil {
+		statusCode := err.(cerror.CustomError).Code()
+		if statusCode == http.StatusNotFound {
+			return nil, cerror.NewError(
+				http.StatusUnauthorized,
+				"user credentials invalid",
+			).SetSeverity(zap.WarnLevel)
+		}
 		return nil, err
 	}
 

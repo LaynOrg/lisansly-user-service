@@ -253,7 +253,7 @@ func TestService_Login(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithEmail(ctx, TestEmail).
-			Return(nil, errors.New("something went wrong"))
+			Return(nil, cerror.NewError(http.StatusNotFound, "not found"))
 
 		userService := NewService(mockUserRepository, nil)
 		_, err := userService.Login(ctx, &LoginPayload{
@@ -274,7 +274,7 @@ func TestService_Login(t *testing.T) {
 				Id:       TestUserId,
 				Name:     TestUserName,
 				Email:    TestEmail,
-				Password: "",
+				Password: "different-password",
 				Role:     RoleUser,
 			}, nil)
 
