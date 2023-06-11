@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/aws/aws-lambda-go v1.41.0
-	github.com/awslabs/aws-lambda-go-api-proxy v0.13.3
-	github.com/go-playground/validator v9.31.0+incompatible
+	github.com/awslabs/aws-lambda-go-api-proxy v0.14.0
+	github.com/go-playground/validator/v10 v10.14.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.46.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
@@ -15,7 +15,7 @@ require (
 	github.com/kr/pretty v0.3.1
 	github.com/stretchr/testify v1.8.2
 	github.com/testcontainers/testcontainers-go v0.18.0
-	go.mongodb.org/mongo-driver v1.11.6
+	go.mongodb.org/mongo-driver v1.11.7
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.9.0
 )
@@ -31,6 +31,7 @@ require (
 	github.com/docker/docker v23.0.3+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -77,6 +78,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230323212658-478b75c54725 // indirect
 	google.golang.org/grpc v1.54.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
-	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/awslabs/aws-lambda-go-api-proxy => github.com/marvin-w/aws-lambda-go-api-proxy v0.14.1

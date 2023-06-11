@@ -61,6 +61,19 @@ cKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc
 mwIDAQAB
 -----END PUBLIC KEY-----`)
 
+var TestJwtClaims = &jwt_generator.Claims{
+	Name:  TestUserName,
+	Email: TestEmail,
+	Role:  RoleUser,
+	RegisteredClaims: jwt.RegisteredClaims{
+		ID:        uuid.New().String(),
+		Issuer:    jwt_generator.IssuerDefault,
+		Subject:   TestUserId,
+		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(10 * time.Minute)),
+		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+	},
+}
+
 const (
 	TestUserId                        = "abcd-abcd-abcd-abcd-abcd"
 	TestCryptPassword                 = "$2a$07$21Py6b8E1XWLlpSS1ASxK.RhNpvm1n3q34G9uqysCwx/ciP0vSaEm\n"
@@ -384,6 +397,46 @@ func TestService_Login(t *testing.T) {
 	})
 }
 
+func TestService_UpdateUserById(t *testing.T) {
+	TestUpdateUserPayload := &UpdateUserPayload{
+		Name:     TestUserName,
+		Email:    TestEmail,
+		Password: TestPassword,
+	}
+
+	mockController := gomock.NewController(t)
+	defer mockController.Finish()
+
+	t.Run("happy path", func(t *testing.T) {
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+			Return(nil)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(&Document{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
+				UpdatedAt: time.Now().UTC(),
+			}, nil)
+
+		jwtGenerator, _ := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, jwtGenerator)
+		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+
+		assert.NoError(t, err)
+		assert.NotEmpty(t, tokens)
+	})
+}
+
 func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 	mockController := gomock.NewController(t)
 	defer mockController.Finish()
@@ -564,18 +617,7 @@ func TestService_VerifyAccessToken(t *testing.T) {
 		mockJwtGenerator.
 			EXPECT().
 			VerifyToken(accessToken).
-			Return(&jwt_generator.Claims{
-				Name:  TestUserName,
-				Email: TestEmail,
-				Role:  RoleUser,
-				RegisteredClaims: jwt.RegisteredClaims{
-					ID:        uuid.New().String(),
-					Issuer:    jwt_generator.IssuerDefault,
-					Subject:   TestUserId,
-					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(10 * time.Minute)),
-					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-				},
-			}, nil)
+			Return(TestJwtClaims, nil)
 
 		mockUserRepository := NewMockRepository(mockController)
 		mockUserRepository.
@@ -592,9 +634,12 @@ func TestService_VerifyAccessToken(t *testing.T) {
 
 		ctx := context.Background()
 		service := NewService(mockUserRepository, mockJwtGenerator)
-		err = service.VerifyAccessToken(ctx, accessToken)
+
+		var jwtClaims *jwt_generator.Claims
+		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
 
 		assert.NoError(t, err)
+		assert.Equal(t, TestJwtClaims, jwtClaims)
 	})
 
 	t.Run("when jwt is not valid should return error", func(t *testing.T) {
@@ -616,9 +661,12 @@ func TestService_VerifyAccessToken(t *testing.T) {
 
 		ctx := context.Background()
 		service := NewService(nil, mockJwtGenerator)
-		err = service.VerifyAccessToken(ctx, accessToken)
+
+		var jwtClaims *jwt_generator.Claims
+		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
 
 		assert.Error(t, err)
+		assert.Empty(t, jwtClaims)
 	})
 
 	t.Run("when user can't find by user id should return error", func(t *testing.T) {
@@ -657,9 +705,12 @@ func TestService_VerifyAccessToken(t *testing.T) {
 
 		ctx := context.Background()
 		service := NewService(mockUserRepository, mockJwtGenerator)
-		err = service.VerifyAccessToken(ctx, accessToken)
+
+		var jwtClaims *jwt_generator.Claims
+		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
 
 		assert.Error(t, err)
+		assert.Empty(t, jwtClaims)
 	})
 
 	t.Run("when error occurred find user by user id should return error", func(t *testing.T) {
@@ -698,8 +749,11 @@ func TestService_VerifyAccessToken(t *testing.T) {
 
 		ctx := context.Background()
 		service := NewService(mockUserRepository, mockJwtGenerator)
-		err = service.VerifyAccessToken(ctx, accessToken)
+
+		var jwtClaims *jwt_generator.Claims
+		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
 
 		assert.Error(t, err)
+		assert.Empty(t, jwtClaims)
 	})
 }

@@ -18,8 +18,9 @@ import (
 type Service interface {
 	Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, error)
 	Login(ctx context.Context, user *LoginPayload) (*jwt_generator.Tokens, error)
+	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) (*jwt_generator.Tokens, error)
 	GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (string, error)
-	VerifyAccessToken(ctx context.Context, accessToken string) error
+	VerifyAccessToken(ctx context.Context, accessToken string) (*jwt_generator.Claims, error)
 }
 
 type service struct {
@@ -148,7 +149,7 @@ func (s *service) Login(
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
-			"error occurred while generate",
+			"error occurred while generate access token",
 			zap.Error(err),
 		)
 	}
@@ -159,7 +160,7 @@ func (s *service) Login(
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
-			"error occurred while generate",
+			"error occurred while generate refresh token",
 			zap.Error(err),
 		)
 	}
@@ -172,6 +173,48 @@ func (s *service) Login(
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	return &jwt_generator.Tokens{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+func (s *service) UpdateUserById(
+	ctx context.Context,
+	userId string,
+	user *UpdateUserPayload,
+) (*jwt_generator.Tokens, error) {
+	err := s.userRepository.UpdateUserById(ctx, userId, user)
+	if err != nil {
+		return nil, err
+	}
+
+	var userDocument *Document
+	userDocument, err = s.userRepository.FindUserWithId(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
+	accessToken, err := s.jwtGenerator.GenerateToken(accessTokenExpiresAt, userDocument.Name, userDocument.Email, userId)
+	if err != nil {
+		return nil, cerror.NewError(
+			fiber.StatusInternalServerError,
+			"error occurred while generate access token",
+			zap.Error(err),
+		)
+	}
+
+	refreshTokenExpiresAt := time.Now().UTC().Add(168 * time.Hour)
+	refreshToken, err := s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Name, user.Email, userId)
+	if err != nil {
+		return nil, cerror.NewError(
+			fiber.StatusInternalServerError,
+			"error occurred while generate refresh token",
+			zap.Error(err),
+		)
 	}
 
 	return &jwt_generator.Tokens{
@@ -224,31 +267,31 @@ func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refr
 	return accessToken, nil
 }
 
-func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) error {
+func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) (*jwt_generator.Claims, error) {
 	var err error
 
-	var claims *jwt_generator.Claims
-	claims, err = s.jwtGenerator.VerifyToken(accessToken)
+	var jwtClaims *jwt_generator.Claims
+	jwtClaims, err = s.jwtGenerator.VerifyToken(accessToken)
 	if err != nil {
-		return cerror.NewError(
+		return nil, cerror.NewError(
 			http.StatusUnauthorized,
 			err.Error(),
 		).SetSeverity(zapcore.WarnLevel)
 	}
 
-	userId := claims.Subject
+	userId := jwtClaims.Subject
 	_, err = s.userRepository.FindUserWithId(ctx, userId)
 	if err != nil {
 		statusCode := err.(cerror.CustomError).Code()
 		if statusCode == http.StatusNotFound {
-			return cerror.NewError(
+			return nil, cerror.NewError(
 				http.StatusUnauthorized,
 				"user not found email in jwt claims",
 			).SetSeverity(zapcore.WarnLevel)
 		}
 
-		return err
+		return nil, err
 	}
 
-	return nil
+	return jwtClaims, nil
 }

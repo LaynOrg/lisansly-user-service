@@ -5,8 +5,11 @@ package user
 import (
 	"context"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson"
+	"net/http"
 	"testing"
 	"time"
+	"user-api/pkg/cerror"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -865,6 +868,135 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 
 		assert.Nil(t, refreshToken)
 		assert.Error(t, err)
+	})
+}
+
+func TestRepository_UpdateUserById(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		ctx := context.Background()
+		container := setupMongoDbContainer(t, ctx)
+		mongodbUri, err := container.Endpoint(ctx, "mongodb")
+		if err != nil {
+			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
+		}
+
+		client, err := mongo.Connect(context.TODO(), options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			}))
+		require.NoError(t, err)
+
+		_, err = client.
+			Database(TestMongoDbDatabaseName).
+			Collection(TestMongoDbUserCollection).
+			InsertOne(ctx, &Document{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC(),
+			})
+		require.NoError(t, err)
+
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		require.NoError(t, err)
+
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			require.NoError(t, err)
+		}(mongoClient, ctx)
+
+		userRepository := NewRepository(
+			mongoClient,
+			&config.Config{
+				Mongodb: config.MongodbConfig{
+					Uri:      mongodbUri,
+					Username: TestMongoDbUserName,
+					Password: TestMongoDbPassword,
+					Database: TestMongoDbDatabaseName,
+					Collections: map[string]string{
+						config.MongodbUserCollection: TestMongoDbUserCollection,
+					},
+				},
+			},
+		)
+
+		repositoryError := userRepository.UpdateUserById(ctx, TestUserId, &UpdateUserPayload{
+			Name:     "UPDATED-NAME",
+			Email:    "updatedTest@test.com",
+			Password: "updated-test-password",
+		})
+
+		var user *Document
+		err = client.
+			Database(TestMongoDbDatabaseName).
+			Collection(TestMongoDbUserCollection).
+			FindOne(ctx, bson.D{{"_id", TestUserId}}).
+			Decode(&user)
+		require.NoError(t, err)
+
+		assert.NoError(t, repositoryError)
+		assert.Equal(t, user.Name, "UPDATED-NAME")
+		assert.Equal(t, user.Email, "updatedTest@test.com")
+		assert.Equal(t, user.Password, "updated-test-password")
+	})
+
+	t.Run("when attempt to update not exist user return error", func(t *testing.T) {
+		ctx := context.Background()
+		container := setupMongoDbContainer(t, ctx)
+		mongodbUri, err := container.Endpoint(ctx, "mongodb")
+		if err != nil {
+			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
+		}
+
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		require.NoError(t, err)
+
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			require.NoError(t, err)
+		}(mongoClient, ctx)
+
+		userRepository := NewRepository(
+			mongoClient,
+			&config.Config{
+				Mongodb: config.MongodbConfig{
+					Uri:      mongodbUri,
+					Username: TestMongoDbUserName,
+					Password: TestMongoDbPassword,
+					Database: TestMongoDbDatabaseName,
+					Collections: map[string]string{
+						config.MongodbUserCollection: TestMongoDbUserCollection,
+					},
+				},
+			},
+		)
+
+		repositoryError := userRepository.UpdateUserById(ctx, TestUserId, &UpdateUserPayload{
+			Name:     "UPDATED-NAME",
+			Email:    "updatedTest@test.com",
+			Password: "updated-test-password",
+		})
+
+		assert.Error(t, repositoryError)
+		assert.Equal(t, http.StatusNotFound, repositoryError.(cerror.CustomError).Code())
 	})
 }
 

@@ -2,9 +2,7 @@ package user
 
 import (
 	"context"
-
-	"user-api/pkg/cerror"
-	"user-api/pkg/config"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
@@ -12,6 +10,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"user-api/pkg/cerror"
+	"user-api/pkg/config"
 )
 
 type Repository interface {
@@ -20,6 +21,7 @@ type Repository interface {
 	FindUserWithEmail(ctx context.Context, email string) (*Document, error)
 	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryDocument) error
 	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryDocument, error)
+	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) error
 }
 
 type repository struct {
@@ -183,4 +185,38 @@ func (r *repository) FindRefreshTokenWithUserId(
 	}
 
 	return refreshToken, nil
+}
+
+func (r *repository) UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) error {
+	collection := r.mongoClient.
+		Database(r.config.Mongodb.Database).
+		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
+
+	userDocument := &Document{
+		Id:        userId,
+		Name:      user.Name,
+		Email:     user.Email,
+		Password:  user.Password,
+		Role:      RoleUser,
+		UpdatedAt: time.Now().UTC(),
+	}
+
+	update := bson.M{"$set": userDocument}
+	result, err := collection.UpdateByID(ctx, userId, update)
+	if err != nil {
+		return cerror.NewError(
+			fiber.StatusInternalServerError,
+			"error occurred while update user",
+			zap.Error(err),
+		)
+	}
+
+	if result.MatchedCount == 0 {
+		return cerror.NewError(
+			fiber.StatusNotFound,
+			"user not found",
+		)
+	}
+
+	return nil
 }

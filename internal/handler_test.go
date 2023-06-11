@@ -5,6 +5,8 @@ package user
 import (
 	"bytes"
 	"fmt"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,7 +22,6 @@ import (
 
 	"user-api/pkg/cerror"
 	"user-api/pkg/jwt_generator"
-	"user-api/pkg/server"
 )
 
 const (
@@ -35,7 +36,7 @@ const (
 func TestNewHandler(t *testing.T) {
 	userHandler := NewHandler(nil)
 
-	assert.Implements(t, (*server.Handler)(nil), userHandler)
+	assert.Implements(t, (*Handler)(nil), userHandler)
 }
 
 func TestHandler_AuthenticationMiddleware(t *testing.T) {
@@ -56,7 +57,7 @@ func TestHandler_AuthenticationMiddleware(t *testing.T) {
 		mockUserService.
 			EXPECT().
 			VerifyAccessToken(gomock.Any(), accessToken).
-			Return(nil)
+			Return(TestJwtClaims, nil)
 
 		handler := NewHandler(mockUserService)
 		app.Get("/test", handler.AuthenticationMiddleware, func(ctx *fiber.Ctx) error {
@@ -103,6 +104,7 @@ func TestHandler_AuthenticationMiddleware(t *testing.T) {
 			EXPECT().
 			VerifyAccessToken(gomock.Any(), accessToken).
 			Return(
+				nil,
 				cerror.NewError(
 					http.StatusUnauthorized,
 					"access token is not valid",
@@ -241,6 +243,292 @@ func TestHandler_Register(t *testing.T) {
 		resp, _ := app.Test(req)
 
 		assert.Equal(t, resp.StatusCode, fiber.StatusInternalServerError)
+	})
+}
+
+func TestHandler_UpdateUserById(t *testing.T) {
+	mockController := gomock.NewController(t)
+	defer mockController.Finish()
+
+	t.Run("happy path", func(t *testing.T) {
+		TestUpdateUserPayload := &UpdateUserPayload{
+			Name:     TestUserName,
+			Email:    TestEmail,
+			Password: TestPassword,
+		}
+
+		app := fiber.New()
+
+		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+		require.NoError(t, err)
+
+		expirationTime := time.Now().UTC().Add(10 * time.Minute)
+		accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+		require.NoError(t, err)
+
+		mockUserService := NewMockService(mockController)
+		mockUserService.
+			EXPECT().
+			VerifyAccessToken(gomock.Any(), accessToken).
+			Return(&jwt_generator.Claims{
+				Name:  TestUserName,
+				Email: TestEmail,
+				Role:  RoleUser,
+				RegisteredClaims: jwt.RegisteredClaims{
+					ID:        uuid.New().String(),
+					Issuer:    jwt_generator.IssuerDefault,
+					Subject:   TestUserId,
+					ExpiresAt: jwt.NewNumericDate(expirationTime),
+					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+				},
+			}, nil)
+		mockUserService.
+			EXPECT().
+			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+			Return(&jwt_generator.Tokens{
+				AccessToken:  TestAccessToken,
+				RefreshToken: TestRefreshToken,
+			}, nil)
+
+		userHandler := NewHandler(mockUserService)
+		userHandler.RegisterRoutes(app)
+
+		payload, err := json.Marshal(TestUpdateUserPayload)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+
+		bearerToken := fmt.Sprintf("Bearer %s", accessToken)
+		req.Header.Set(fiber.HeaderAuthorization, bearerToken)
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("validation", func(t *testing.T) {
+		t.Run("Email", func(t *testing.T) {
+			TestUpdateUserPayload := &UpdateUserPayload{
+				Email: TestEmail,
+			}
+
+			app := fiber.New()
+
+			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			require.NoError(t, err)
+
+			expirationTime := time.Now().UTC().Add(10 * time.Minute)
+			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			require.NoError(t, err)
+
+			mockUserService := NewMockService(mockController)
+			mockUserService.
+				EXPECT().
+				VerifyAccessToken(gomock.Any(), accessToken).
+				Return(&jwt_generator.Claims{
+					Name:  TestUserName,
+					Email: TestEmail,
+					Role:  RoleUser,
+					RegisteredClaims: jwt.RegisteredClaims{
+						ID:        uuid.New().String(),
+						Issuer:    jwt_generator.IssuerDefault,
+						Subject:   TestUserId,
+						ExpiresAt: jwt.NewNumericDate(expirationTime),
+						IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+					},
+				}, nil)
+			mockUserService.
+				EXPECT().
+				UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+				Return(&jwt_generator.Tokens{
+					AccessToken:  TestAccessToken,
+					RefreshToken: TestRefreshToken,
+				}, nil)
+
+			userHandler := NewHandler(mockUserService)
+			userHandler.RegisterRoutes(app)
+
+			payload, err := json.Marshal(TestUpdateUserPayload)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+
+			bearerToken := fmt.Sprintf("Bearer %s", accessToken)
+			req.Header.Set(fiber.HeaderAuthorization, bearerToken)
+
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		})
+
+		t.Run("Name", func(t *testing.T) {
+			TestUpdateUserPayload := &UpdateUserPayload{
+				Name: TestUserName,
+			}
+
+			app := fiber.New()
+
+			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			require.NoError(t, err)
+
+			expirationTime := time.Now().UTC().Add(10 * time.Minute)
+			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			require.NoError(t, err)
+
+			mockUserService := NewMockService(mockController)
+			mockUserService.
+				EXPECT().
+				VerifyAccessToken(gomock.Any(), accessToken).
+				Return(&jwt_generator.Claims{
+					Name:  TestUserName,
+					Email: TestEmail,
+					Role:  RoleUser,
+					RegisteredClaims: jwt.RegisteredClaims{
+						ID:        uuid.New().String(),
+						Issuer:    jwt_generator.IssuerDefault,
+						Subject:   TestUserId,
+						ExpiresAt: jwt.NewNumericDate(expirationTime),
+						IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+					},
+				}, nil)
+			mockUserService.
+				EXPECT().
+				UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+				Return(&jwt_generator.Tokens{
+					AccessToken:  TestAccessToken,
+					RefreshToken: TestRefreshToken,
+				}, nil)
+
+			userHandler := NewHandler(mockUserService)
+			userHandler.RegisterRoutes(app)
+
+			payload, err := json.Marshal(TestUpdateUserPayload)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+
+			bearerToken := fmt.Sprintf("Bearer %s", accessToken)
+			req.Header.Set(fiber.HeaderAuthorization, bearerToken)
+
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		})
+
+		t.Run("Password", func(t *testing.T) {
+			TestUpdateUserPayload := &UpdateUserPayload{
+				Password: TestPassword,
+			}
+
+			app := fiber.New()
+
+			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			require.NoError(t, err)
+
+			expirationTime := time.Now().UTC().Add(10 * time.Minute)
+			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			require.NoError(t, err)
+
+			mockUserService := NewMockService(mockController)
+			mockUserService.
+				EXPECT().
+				VerifyAccessToken(gomock.Any(), accessToken).
+				Return(&jwt_generator.Claims{
+					Name:  TestUserName,
+					Email: TestEmail,
+					Role:  RoleUser,
+					RegisteredClaims: jwt.RegisteredClaims{
+						ID:        uuid.New().String(),
+						Issuer:    jwt_generator.IssuerDefault,
+						Subject:   TestUserId,
+						ExpiresAt: jwt.NewNumericDate(expirationTime),
+						IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+					},
+				}, nil)
+			mockUserService.
+				EXPECT().
+				UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+				Return(&jwt_generator.Tokens{
+					AccessToken:  TestAccessToken,
+					RefreshToken: TestRefreshToken,
+				}, nil)
+
+			userHandler := NewHandler(mockUserService)
+			userHandler.RegisterRoutes(app)
+
+			payload, err := json.Marshal(TestUpdateUserPayload)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+
+			bearerToken := fmt.Sprintf("Bearer %s", accessToken)
+			req.Header.Set(fiber.HeaderAuthorization, bearerToken)
+
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		})
+
+		t.Run("when all field is empty should return error", func(t *testing.T) {
+			TestUpdateUserPayload := &UpdateUserPayload{
+				Name:     "",
+				Email:    "",
+				Password: "",
+			}
+
+			app := fiber.New(fiber.Config{
+				ErrorHandler: cerror.Middleware,
+			})
+
+			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			require.NoError(t, err)
+
+			expirationTime := time.Now().UTC().Add(10 * time.Minute)
+			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			require.NoError(t, err)
+
+			mockUserService := NewMockService(mockController)
+			mockUserService.
+				EXPECT().
+				VerifyAccessToken(gomock.Any(), accessToken).
+				Return(&jwt_generator.Claims{
+					Name:  TestUserName,
+					Email: TestEmail,
+					Role:  RoleUser,
+					RegisteredClaims: jwt.RegisteredClaims{
+						ID:        uuid.New().String(),
+						Issuer:    jwt_generator.IssuerDefault,
+						Subject:   TestUserId,
+						ExpiresAt: jwt.NewNumericDate(expirationTime),
+						IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+					},
+				}, nil)
+
+			userHandler := NewHandler(mockUserService)
+			userHandler.RegisterRoutes(app)
+
+			payload, err := json.Marshal(TestUpdateUserPayload)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+
+			bearerToken := fmt.Sprintf("Bearer %s", accessToken)
+			req.Header.Set(fiber.HeaderAuthorization, bearerToken)
+
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+		})
 	})
 }
 
