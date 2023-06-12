@@ -58,9 +58,39 @@ jobs:
           go test -tags=unit -coverprofile coverage.out -covermode count ./...
           go tool cover -func coverage.out
 
-  security-analysis:
+      - uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage
+          path: coverage.out
+
+  code-analysis:
     needs:
       - unit-test
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download coverage output
+        uses: actions/download-artifact@v3
+        with:
+          name: code-coverage
+
+      - name: Code analysis
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_REPO_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+
+      - name: Quality Gate check
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+
+  security-analysis:
+    needs:
+      - code-analysis
 
     runs-on: ubuntu-latest
     steps:
