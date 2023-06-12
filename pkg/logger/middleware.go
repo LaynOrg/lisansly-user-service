@@ -20,16 +20,17 @@ func Middleware(logger Logger) func(ctx *fiber.Ctx) error {
 func FromContext(ctx context.Context) Logger {
 	var (
 		logger Logger
-		ok     bool
+		isOk   bool
 	)
 
-	logger, ok = ctx.Value(ContextKey).(Logger)
-	if !ok {
+	logger, isOk = ctx.Value(ContextKey).(Logger)
+	if !isOk {
 		logger = NewLogger()
 	}
 
-	lambdaCtx, ok := lambdacontext.FromContext(ctx)
-	if ok {
+	var lambdaCtx *lambdacontext.LambdaContext
+	lambdaCtx, isOk = lambdacontext.FromContext(ctx)
+	if isOk {
 		logger.With(zap.String("requestId", lambdaCtx.AwsRequestID))
 	}
 
