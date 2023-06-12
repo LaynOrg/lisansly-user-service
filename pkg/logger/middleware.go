@@ -3,7 +3,9 @@ package logger
 import (
 	"context"
 
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/zap"
 )
 
 const ContextKey = "logger"
@@ -23,7 +25,12 @@ func FromContext(ctx context.Context) Logger {
 
 	logger, ok = ctx.Value(ContextKey).(Logger)
 	if !ok {
-		return NewLogger()
+		logger = NewLogger()
+	}
+
+	lambdaCtx, ok := lambdacontext.FromContext(ctx)
+	if ok {
+		logger.With(zap.String("requestId", lambdaCtx.AwsRequestID))
 	}
 
 	return logger
