@@ -45,8 +45,16 @@ func main() {
 		panic(err)
 	}
 
-	mongoClient := setupMongodbClient(cfg)
-	userRepository := user.NewRepository(mongoClient, cfg.Mongodb)
+	ctx := context.Background()
+	mongoDbClient := setupMongodbClient(cfg)
+	defer func(mongoClient *mongo.Client, ctx context.Context) {
+		err := mongoClient.Disconnect(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}(mongoDbClient, ctx)
+
+	userRepository := user.NewRepository(mongoDbClient, cfg.Mongodb)
 	userService := user.NewService(userRepository, jwtGenerator)
 	userHandler := user.NewHandler(userService)
 
@@ -90,12 +98,6 @@ func setupMongodbClient(cfg *config.Config) *mongo.Client {
 	if err != nil {
 		panic(err)
 	}
-	defer func(mongoClient *mongo.Client, ctx context.Context) {
-		err := mongoClient.Disconnect(ctx)
-		if err != nil {
-			panic(err)
-		}
-	}(mongodbClient, ctx)
 
 	return mongodbClient
 }
