@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/aws/aws-lambda-go v1.41.0
-	github.com/awslabs/aws-lambda-go-api-proxy v0.14.0
+	github.com/awslabs/aws-lambda-go-api-proxy v0.13.3
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.46.0
@@ -80,5 +80,3 @@ require (
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/awslabs/aws-lambda-go-api-proxy => github.com/marvin-w/aws-lambda-go-api-proxy v0.14.1
