@@ -32,7 +32,7 @@ const (
 )
 
 func TestNewRepository(t *testing.T) {
-	userRepository := NewRepository(nil, nil)
+	userRepository := NewRepository(nil, config.MongodbConfig{})
 
 	assert.Implements(t, (*Repository)(nil), userRepository)
 }
@@ -66,12 +66,10 @@ func TestRepository_InsertUser(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -106,7 +104,7 @@ func TestRepository_InsertUser(t *testing.T) {
 			}
 		}(mongoClient, ctx)
 
-		userRepository := NewRepository(mongoClient, &config.Config{})
+		userRepository := NewRepository(mongoClient, config.MongodbConfig{})
 
 		_, err = userRepository.InsertUser(ctx, &Document{
 			Id:       TestUserId,
@@ -145,15 +143,13 @@ func TestRepository_InsertUser(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: "",
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: "",
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -197,15 +193,13 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
 				},
 			},
 		)
@@ -241,7 +235,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			}
 		}(mongoClient, ctx)
 
-		userRepository := NewRepository(mongoClient, &config.Config{})
+		userRepository := NewRepository(mongoClient, config.MongodbConfig{})
 
 		RefreshTokenExpiresAt := time.Now().UTC().Add(180 * time.Minute)
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
@@ -282,15 +276,13 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: "",
-					Collections: map[string]string{
-						config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: "",
+				Collections: map[string]string{
+					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
 				},
 			},
 		)
@@ -354,15 +346,13 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -393,7 +383,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			}
 		}(mongoClient, ctx)
 
-		userRepository := NewRepository(mongoClient, &config.Config{})
+		userRepository := NewRepository(mongoClient, config.MongodbConfig{})
 
 		_, err = userRepository.FindUserWithEmail(ctx, TestEmail)
 
@@ -428,15 +418,13 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -475,15 +463,13 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -542,15 +528,13 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -581,7 +565,7 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 			}
 		}(mongoClient, ctx)
 
-		userRepository := NewRepository(mongoClient, &config.Config{})
+		userRepository := NewRepository(mongoClient, config.MongodbConfig{})
 
 		_, err = userRepository.FindUserWithId(ctx, TestEmail)
 
@@ -616,15 +600,13 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -663,15 +645,13 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -730,15 +710,13 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
 				},
 			},
 		)
@@ -769,7 +747,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			}
 		}(mongoClient, ctx)
 
-		userRepository := NewRepository(mongoClient, &config.Config{})
+		userRepository := NewRepository(mongoClient, config.MongodbConfig{})
 
 		_, err = userRepository.FindRefreshTokenWithUserId(ctx, TestEmail)
 
@@ -804,15 +782,13 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
 				},
 			},
 		)
@@ -851,15 +827,13 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
 				},
 			},
 		)
@@ -918,15 +892,13 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)
@@ -976,15 +948,13 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		userRepository := NewRepository(
 			mongoClient,
-			&config.Config{
-				Mongodb: config.MongodbConfig{
-					Uri:      mongodbUri,
-					Username: TestMongoDbUserName,
-					Password: TestMongoDbPassword,
-					Database: TestMongoDbDatabaseName,
-					Collections: map[string]string{
-						config.MongodbUserCollection: TestMongoDbUserCollection,
-					},
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
 				},
 			},
 		)

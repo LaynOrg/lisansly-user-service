@@ -46,7 +46,7 @@ func main() {
 	}
 
 	mongoClient := setupMongodbClient(cfg)
-	userRepository := user.NewRepository(mongoClient, cfg)
+	userRepository := user.NewRepository(mongoClient, cfg.Mongodb)
 	userService := user.NewService(userRepository, jwtGenerator)
 	userHandler := user.NewHandler(userService)
 

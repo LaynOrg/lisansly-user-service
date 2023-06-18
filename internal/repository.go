@@ -25,24 +25,24 @@ type Repository interface {
 }
 
 type repository struct {
-	mongoClient *mongo.Client
-	config      *config.Config
+	mongoClient   *mongo.Client
+	mongoDbConfig config.MongodbConfig
 }
 
 func NewRepository(
 	mongoClient *mongo.Client,
-	config *config.Config,
+	mongoDbConfig config.MongodbConfig,
 ) Repository {
 	return &repository{
-		mongoClient: mongoClient,
-		config:      config,
+		mongoClient:   mongoClient,
+		mongoDbConfig: mongoDbConfig,
 	}
 }
 
 func (r *repository) InsertUser(ctx context.Context, user *Document) (string, error) {
 	collection := r.mongoClient.
-		Database(r.config.Mongodb.Database).
-		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
+		Database(r.mongoDbConfig.Database).
+		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
 
 	var foundUser *Document
 
@@ -88,8 +88,8 @@ func (r *repository) InsertRefreshTokenHistory(
 	refreshTokenHistory *RefreshTokenHistoryDocument,
 ) error {
 	collection := r.mongoClient.
-		Database(r.config.Mongodb.Database).
-		Collection(r.config.Mongodb.Collections[config.MongoDbRefreshTokenHistoryCollection])
+		Database(r.mongoDbConfig.Database).
+		Collection(r.mongoDbConfig.Collections[config.MongoDbRefreshTokenHistoryCollection])
 
 	_, err := collection.InsertOne(ctx, refreshTokenHistory)
 	if err != nil {
@@ -105,8 +105,8 @@ func (r *repository) InsertRefreshTokenHistory(
 
 func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Document, error) {
 	collection := r.mongoClient.
-		Database(r.config.Mongodb.Database).
-		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
+		Database(r.mongoDbConfig.Database).
+		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
 
 	var user *Document
 
@@ -132,8 +132,8 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Docu
 
 func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Document, error) {
 	collection := r.mongoClient.
-		Database(r.config.Mongodb.Database).
-		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
+		Database(r.mongoDbConfig.Database).
+		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
 
 	var user *Document
 
@@ -161,8 +161,8 @@ func (r *repository) FindRefreshTokenWithUserId(
 	ctx context.Context, userId string,
 ) (*RefreshTokenHistoryDocument, error) {
 	collection := r.mongoClient.
-		Database(r.config.Mongodb.Database).
-		Collection(r.config.Mongodb.Collections[config.MongoDbRefreshTokenHistoryCollection])
+		Database(r.mongoDbConfig.Database).
+		Collection(r.mongoDbConfig.Collections[config.MongoDbRefreshTokenHistoryCollection])
 
 	var refreshToken *RefreshTokenHistoryDocument
 
@@ -189,8 +189,8 @@ func (r *repository) FindRefreshTokenWithUserId(
 
 func (r *repository) UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) error {
 	collection := r.mongoClient.
-		Database(r.config.Mongodb.Database).
-		Collection(r.config.Mongodb.Collections[config.MongodbUserCollection])
+		Database(r.mongoDbConfig.Database).
+		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
 
 	userDocument := &Document{
 		Id:        userId,
