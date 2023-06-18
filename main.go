@@ -46,27 +46,7 @@ func main() {
 		panic(err)
 	}
 
-	mongodbServerAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
-	credentials := options.Client().
-		ApplyURI(cfg.Mongodb.Uri).
-		SetAuth(options.Credential{
-			Username: cfg.Mongodb.Username,
-			Password: cfg.Mongodb.Password,
-		}).
-		SetServerAPIOptions(mongodbServerAPIOptions)
-
-	ctx := context.Background()
-	mongoClient, err := mongo.Connect(ctx, credentials)
-	if err != nil {
-		panic(err)
-	}
-	defer func(mongoClient *mongo.Client, ctx context.Context) {
-		err := mongoClient.Disconnect(ctx)
-		if err != nil {
-			panic(err)
-		}
-	}(mongoClient, ctx)
-
+	mongoClient := setupMongodbClient(cfg)
 	userRepository := user.NewRepository(mongoClient, cfg)
 	userService := user.NewService(userRepository, jwtFactory)
 	userHandler := user.NewHandler(userService)
@@ -92,4 +72,30 @@ func main() {
 	} else {
 		lambda.Start(srv.LambdaProxyHandler)
 	}
+}
+
+func setupMongodbClient(cfg *config.Config) *mongo.Client {
+	mongodbCredential := options.Credential{
+		Username: cfg.Mongodb.Username,
+		Password: cfg.Mongodb.Password,
+	}
+	mongodbServerAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+	credentials := options.Client().
+		ApplyURI(cfg.Mongodb.Uri).
+		SetAuth(mongodbCredential).
+		SetServerAPIOptions(mongodbServerAPIOptions)
+
+	ctx := context.Background()
+	mongodbClient, err := mongo.Connect(ctx, credentials)
+	if err != nil {
+		panic(err)
+	}
+	defer func(mongoClient *mongo.Client, ctx context.Context) {
+		err := mongoClient.Disconnect(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}(mongodbClient, ctx)
+
+	return mongodbClient
 }
