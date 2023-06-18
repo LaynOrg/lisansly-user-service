@@ -46,12 +46,14 @@ func main() {
 		panic(err)
 	}
 
+	mongodbServerAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
 	credentials := options.Client().
 		ApplyURI(cfg.Mongodb.Uri).
 		SetAuth(options.Credential{
 			Username: cfg.Mongodb.Username,
 			Password: cfg.Mongodb.Password,
-		})
+		}).
+		SetServerAPIOptions(mongodbServerAPIOptions)
 
 	ctx := context.Background()
 	mongoClient, err := mongo.Connect(ctx, credentials)
