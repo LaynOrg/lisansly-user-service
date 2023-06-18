@@ -39,18 +39,18 @@ func main() {
 	}
 	cfg.Print()
 
-	var handlers []server.Handler
-
-	jwtFactory, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+	var jwtGenerator jwt_generator.JwtGenerator
+	jwtGenerator, err = jwt_generator.NewJwtGenerator(cfg.Jwt)
 	if err != nil {
 		panic(err)
 	}
 
 	mongoClient := setupMongodbClient(cfg)
 	userRepository := user.NewRepository(mongoClient, cfg)
-	userService := user.NewService(userRepository, jwtFactory)
+	userService := user.NewService(userRepository, jwtGenerator)
 	userHandler := user.NewHandler(userService)
 
+	var handlers []server.Handler
 	handlers = append(handlers, userHandler)
 	srv := server.NewServer(cfg, handlers)
 

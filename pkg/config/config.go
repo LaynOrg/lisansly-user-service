@@ -96,7 +96,7 @@ func ReadJwtConfig() (JwtConfig, error) {
 	}
 
 	return JwtConfig{
-		PrivateKey: privateKey,
-		PublicKey:  publicKey,
+		PrivateKey: []byte(privateKey),
+		PublicKey:  []byte(publicKey),
 	}, nil
 }

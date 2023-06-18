@@ -5,18 +5,19 @@ package user
 import (
 	"bytes"
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+	"user-api/pkg/config"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -46,11 +47,14 @@ func TestHandler_AuthenticationMiddleware(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		app := fiber.New()
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte(`secret-key`))
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+			PrivateKey: TestPrivateKey,
+			PublicKey:  TestPublicKey,
+		})
 		require.NoError(t, err)
 
 		accessTokenExpireTime := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
+		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
 		require.NoError(t, err)
 
 		mockUserService := NewMockService(mockController)
@@ -92,11 +96,14 @@ func TestHandler_AuthenticationMiddleware(t *testing.T) {
 			ErrorHandler: cerror.Middleware,
 		})
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte(`secret-key`))
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+			PrivateKey: TestPrivateKey,
+			PublicKey:  TestPublicKey,
+		})
 		require.NoError(t, err)
 
 		accessTokenExpireTime := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
+		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
 		require.NoError(t, err)
 
 		mockUserService := NewMockService(mockController)
@@ -259,11 +266,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 		app := fiber.New()
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+			PrivateKey: TestPrivateKey,
+			PublicKey:  TestPublicKey,
+		})
 		require.NoError(t, err)
 
 		expirationTime := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+		accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
 		require.NoError(t, err)
 
 		mockUserService := NewMockService(mockController)
@@ -316,11 +326,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 			app := fiber.New()
 
-			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+				PrivateKey: TestPrivateKey,
+				PublicKey:  TestPublicKey,
+			})
 			require.NoError(t, err)
 
 			expirationTime := time.Now().UTC().Add(10 * time.Minute)
-			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
 			require.NoError(t, err)
 
 			mockUserService := NewMockService(mockController)
@@ -372,11 +385,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 			app := fiber.New()
 
-			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+				PrivateKey: TestPrivateKey,
+				PublicKey:  TestPublicKey,
+			})
 			require.NoError(t, err)
 
 			expirationTime := time.Now().UTC().Add(10 * time.Minute)
-			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
 			require.NoError(t, err)
 
 			mockUserService := NewMockService(mockController)
@@ -428,11 +444,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 			app := fiber.New()
 
-			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+				PrivateKey: TestPrivateKey,
+				PublicKey:  TestPublicKey,
+			})
 			require.NoError(t, err)
 
 			expirationTime := time.Now().UTC().Add(10 * time.Minute)
-			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
 			require.NoError(t, err)
 
 			mockUserService := NewMockService(mockController)
@@ -488,11 +507,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			jwtGenerator, err := jwt_generator.NewJwtGenerator([]byte("secret-key"))
+			jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+				PrivateKey: TestPrivateKey,
+				PublicKey:  TestPublicKey,
+			})
 			require.NoError(t, err)
 
 			expirationTime := time.Now().UTC().Add(10 * time.Minute)
-			accessToken, err := jwtGenerator.GenerateToken(expirationTime, TestUserName, TestEmail, TestUserId)
+			accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
 			require.NoError(t, err)
 
 			mockUserService := NewMockService(mockController)

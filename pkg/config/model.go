@@ -27,6 +27,6 @@ type MongodbConfig struct {
 }
 
 type JwtConfig struct {
-	PrivateKey string
-	PublicKey  string
+	PrivateKey []byte
+	PublicKey  []byte
 }

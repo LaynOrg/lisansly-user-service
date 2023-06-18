@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -74,8 +73,8 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	var accessToken string
-	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Name, user.Email, userId)
+	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
+	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, userId)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -85,8 +84,8 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	var refreshToken string
-	refreshTokenExpiresAt := time.Now().UTC().Add(168 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Name, user.Email, userId)
+	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken()
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -126,9 +125,9 @@ func (s *service) Login(
 	user, err = s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
 	if err != nil {
 		statusCode := err.(cerror.CustomError).Code()
-		if statusCode == http.StatusNotFound {
+		if statusCode == fiber.StatusNotFound {
 			return nil, cerror.NewError(
-				http.StatusUnauthorized,
+				fiber.StatusUnauthorized,
 				"user credentials invalid",
 			).SetSeverity(zap.WarnLevel)
 		}
@@ -144,8 +143,8 @@ func (s *service) Login(
 	}
 
 	var accessToken string
-	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
+	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
+	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -155,8 +154,8 @@ func (s *service) Login(
 	}
 
 	var refreshToken string
-	refreshTokenExpiresAt := time.Now().UTC().Add(168 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Name, user.Email, user.Id)
+	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken()
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -197,8 +196,13 @@ func (s *service) UpdateUserById(
 		return nil, err
 	}
 
-	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err := s.jwtGenerator.GenerateToken(accessTokenExpiresAt, userDocument.Name, userDocument.Email, userId)
+	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
+	accessToken, err := s.jwtGenerator.GenerateAccessToken(
+		accessTokenExpiresAt,
+		userDocument.Name,
+		userDocument.Email,
+		userId,
+	)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -207,14 +211,24 @@ func (s *service) UpdateUserById(
 		)
 	}
 
-	refreshTokenExpiresAt := time.Now().UTC().Add(168 * time.Hour)
-	refreshToken, err := s.jwtGenerator.GenerateToken(refreshTokenExpiresAt, user.Name, user.Email, userId)
+	refreshToken, err := s.jwtGenerator.GenerateRefreshToken()
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
 			"error occurred while generate refresh token",
 			zap.Error(err),
 		)
+	}
+
+	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
+	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
+		Id:        uuid.New().String(),
+		UserID:    userId,
+		Token:     refreshToken,
+		ExpiresAt: refreshTokenExpiresAt,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &jwt_generator.Tokens{
@@ -254,8 +268,8 @@ func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refr
 	}
 
 	var accessToken string
-	accessTokenExpiresAt := time.Now().UTC().Add(10 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
+	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
+	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
 		return "", cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -271,10 +285,10 @@ func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) (*j
 	var err error
 
 	var jwtClaims *jwt_generator.Claims
-	jwtClaims, err = s.jwtGenerator.VerifyToken(accessToken)
+	jwtClaims, err = s.jwtGenerator.VerifyAccessToken(accessToken)
 	if err != nil {
 		return nil, cerror.NewError(
-			http.StatusUnauthorized,
+			fiber.StatusUnauthorized,
 			err.Error(),
 		).SetSeverity(zapcore.WarnLevel)
 	}
@@ -283,9 +297,9 @@ func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) (*j
 	_, err = s.userRepository.FindUserWithId(ctx, userId)
 	if err != nil {
 		statusCode := err.(cerror.CustomError).Code()
-		if statusCode == http.StatusNotFound {
+		if statusCode == fiber.StatusNotFound {
 			return nil, cerror.NewError(
-				http.StatusUnauthorized,
+				fiber.StatusUnauthorized,
 				"user not found email in jwt claims",
 			).SetSeverity(zapcore.WarnLevel)
 		}

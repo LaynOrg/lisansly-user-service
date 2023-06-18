@@ -1,34 +1,50 @@
 package jwt_generator
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+
+	"user-api/pkg/config"
 )
 
 type JwtGenerator interface {
-	GenerateToken(expirationTime time.Time, name, email, userId string) (string, error)
-	VerifyToken(rawJwtToken string) (*Claims, error)
+	GenerateAccessToken(expirationTime time.Time, name, email, userId string) (string, error)
+	GenerateRefreshToken() (string, error)
+	VerifyAccessToken(rawJwtToken string) (*Claims, error)
 }
 
 type jwtGenerator struct {
-	secretKey []byte
+	privateKey *ecdsa.PrivateKey
+	publicKey  *ecdsa.PublicKey
 }
 
-func NewJwtGenerator(secretKey []byte) (JwtGenerator, error) {
+func NewJwtGenerator(jwtConfig config.JwtConfig) (JwtGenerator, error) {
+	parsedEC256PrivateKey, err := jwt.ParseECPrivateKeyFromPEM(jwtConfig.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedEC256PublicKey, err := jwt.ParseECPublicKeyFromPEM(jwtConfig.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &jwtGenerator{
-		secretKey: secretKey,
+		privateKey: parsedEC256PrivateKey,
+		publicKey:  parsedEC256PublicKey,
 	}, nil
 }
 
-func (jwtGenerator *jwtGenerator) GenerateToken(
+func (jwtGenerator *jwtGenerator) GenerateAccessToken(
 	expirationTime time.Time,
 	name, email, userId string,
 ) (string, error) {
-	issuedAt := time.Now().UTC()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+	now := time.Now().UTC()
+	claims := Claims{
 		Name:  name,
 		Email: email,
 		Role:  RoleUser,
@@ -36,12 +52,15 @@ func (jwtGenerator *jwtGenerator) GenerateToken(
 			ID:        uuid.New().String(),
 			Subject:   userId,
 			Issuer:    IssuerDefault,
-			IssuedAt:  jwt.NewNumericDate(issuedAt),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},
-	})
+	}
 
-	signedToken, err := token.SignedString(jwtGenerator.secretKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+
+	signedToken, err := token.SignedString(jwtGenerator.privateKey)
 	if err != nil {
 		return "", err
 	}
@@ -49,16 +68,32 @@ func (jwtGenerator *jwtGenerator) GenerateToken(
 	return signedToken, nil
 }
 
-func (jwtGenerator *jwtGenerator) VerifyToken(rawJwtToken string) (*Claims, error) {
-	var claims *Claims
+func (jwtGenerator *jwtGenerator) GenerateRefreshToken() (string, error) {
+	token := jwt.New(jwt.SigningMethodES256)
 
-	jwtToken, err := jwt.ParseWithClaims(rawJwtToken, claims, nil)
+	signedToken, err := token.SignedString(jwtGenerator.privateKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	if _, ok := jwtToken.Method.(*jwt.SigningMethodHMAC); !ok {
-		return nil, errors.New("ambiguous jwt token signing method")
+	return signedToken, nil
+}
+
+func (jwtGenerator *jwtGenerator) VerifyAccessToken(rawJwtToken string) (*Claims, error) {
+	var (
+		err    error
+		claims Claims
+	)
+
+	_, err = jwt.ParseWithClaims(rawJwtToken, &claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+			return nil, errors.New("jwt token is not valid signature")
+		}
+
+		return jwtGenerator.publicKey, nil
+	}, jwt.WithoutClaimsValidation())
+	if err != nil {
+		return nil, err
 	}
 
 	isValidIssuer := claims.VerifyIssuer(IssuerDefault, true)
@@ -72,5 +107,10 @@ func (jwtGenerator *jwtGenerator) VerifyToken(rawJwtToken string) (*Claims, erro
 		return nil, errors.New("expired jwt token")
 	}
 
-	return claims, nil
+	isTokenStarted := claims.VerifyNotBefore(now, true)
+	if !isTokenStarted {
+		return nil, errors.New("jwt token is not started")
+	}
+
+	return &claims, nil
 }
