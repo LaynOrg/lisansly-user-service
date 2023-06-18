@@ -2,9 +2,9 @@ package config
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/kr/pretty"
+	"os"
+	"strings"
 )
 
 type Config struct {
@@ -89,11 +89,13 @@ func ReadJwtConfig() (JwtConfig, error) {
 	if privateKey == "" {
 		return JwtConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, JwtPrivateKey)
 	}
+	privateKey = strings.Replace(privateKey, `\n`, "\n", -1)
 
 	publicKey := os.Getenv(JwtPublicKey)
 	if publicKey == "" {
 		return JwtConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, JwtPublicKey)
 	}
+	publicKey = strings.Replace(publicKey, `\n`, "\n", -1)
 
 	return JwtConfig{
 		PrivateKey: []byte(privateKey),
