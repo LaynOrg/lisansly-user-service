@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"user-api/pkg/config"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
@@ -18,6 +17,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"user-api/pkg/cerror"
+	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
 )
 
@@ -427,6 +427,144 @@ func TestService_UpdateUserById(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotEmpty(t, tokens)
+	})
+
+	t.Run("when error occurred while update user by id should return error", func(t *testing.T) {
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+			Return(errors.New("update user error"))
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, nil)
+		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+
+		assert.Error(t, err)
+		assert.Empty(t, tokens)
+	})
+
+	t.Run("when error occurred while find user by id should return error", func(t *testing.T) {
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+			Return(nil)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(nil, errors.New("user not found"))
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, nil)
+		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+
+		assert.Error(t, err)
+		assert.Empty(t, tokens)
+	})
+
+	t.Run("when error occurred while generate access token should return error", func(t *testing.T) {
+		mockUserRepository := NewMockRepository(mockController)
+		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
+		mockUserRepository.
+			EXPECT().
+			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+			Return(nil)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(&Document{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
+				UpdatedAt: time.Now().UTC(),
+			}, nil)
+		mockJwtGenerator.
+			EXPECT().
+			GenerateAccessToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
+			Return("", errors.New("generate access token error"))
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, mockJwtGenerator)
+		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+
+		assert.Error(t, err)
+		assert.Empty(t, tokens)
+	})
+
+	t.Run("when error occurred while generate refresh token should return error", func(t *testing.T) {
+		mockUserRepository := NewMockRepository(mockController)
+		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
+		mockUserRepository.
+			EXPECT().
+			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+			Return(nil)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(&Document{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
+				UpdatedAt: time.Now().UTC(),
+			}, nil)
+		mockJwtGenerator.
+			EXPECT().
+			GenerateAccessToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
+			Return("abcd.abcd.abcd", nil)
+		mockJwtGenerator.
+			EXPECT().
+			GenerateRefreshToken(gomock.Any(), TestUserId).
+			Return("", errors.New("generate refresh token error"))
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, mockJwtGenerator)
+		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+
+		assert.Error(t, err)
+		assert.Empty(t, tokens)
+	})
+
+	t.Run("when error occurred while insert refresh token with user id should return error", func(t *testing.T) {
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
+			Return(nil)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(&Document{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
+				UpdatedAt: time.Now().UTC(),
+			}, nil)
+		mockUserRepository.
+			EXPECT().
+			InsertRefreshTokenHistory(gomock.Any(), gomock.Any()).
+			Return(errors.New("insert refresh token error"))
+
+		jwtGenerator, _ := jwt_generator.NewJwtGenerator(config.JwtConfig{
+			PrivateKey: TestPrivateKey,
+			PublicKey:  TestPublicKey,
+		})
+
+		ctx := context.Background()
+		service := NewService(mockUserRepository, jwtGenerator)
+		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+
+		assert.Error(t, err)
+		assert.Empty(t, tokens)
 	})
 }
 

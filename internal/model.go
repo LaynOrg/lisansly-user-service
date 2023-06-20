@@ -20,11 +20,11 @@ type UpdateUserPayload struct {
 }
 
 type Document struct {
-	Id        string    `bson:"_id"`
-	Name      string    `json:"name"`
-	Email     string    `bson:"email"`
-	Password  string    `bson:"password"`
-	Role      string    `bson:"role"`
+	Id        string    `bson:"_id,,omitempty"`
+	Name      string    `json:"name,omitempty"`
+	Email     string    `bson:"email,omitempty"`
+	Password  string    `bson:"password,omitempty"`
+	Role      string    `bson:"role,omitempty"`
 	CreatedAt time.Time `bson:"createdAt,omitempty"`
 	UpdatedAt time.Time `bson:"updatedAt,omitempty"`
 	DeletedAt time.Time `bson:"deletedAt,omitempty"`

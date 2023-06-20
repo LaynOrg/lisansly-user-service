@@ -193,7 +193,6 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, user *Up
 		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
 
 	userDocument := &Document{
-		Id:        userId,
 		Name:      user.Name,
 		Email:     user.Email,
 		Password:  user.Password,
@@ -201,8 +200,27 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, user *Up
 		UpdatedAt: time.Now().UTC(),
 	}
 
-	update := bson.M{"$set": userDocument}
-	result, err := collection.UpdateByID(ctx, userId, update)
+	if userDocument.Email != "" {
+		count, err := collection.CountDocuments(ctx, &bson.M{"email": userDocument.Email})
+		if err != nil {
+			return cerror.NewError(
+				fiber.StatusInternalServerError,
+				"error occurred while find email address",
+				zap.Error(err),
+			)
+		}
+
+		if count > 0 {
+			return cerror.NewError(
+				fiber.StatusConflict,
+				"same email address already exist in user collection",
+			)
+		}
+	}
+
+	update := bson.D{{"$set", userDocument}}
+	updateOptions := options.Update().SetUpsert(false)
+	result, err := collection.UpdateByID(ctx, userId, update, updateOptions)
 	if err != nil {
 		return cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -211,7 +229,7 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, user *Up
 		)
 	}
 
-	if result.MatchedCount == 0 {
+	if result.ModifiedCount == 0 {
 		return cerror.NewError(
 			fiber.StatusNotFound,
 			"user not found",

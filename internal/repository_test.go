@@ -923,7 +923,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		assert.Equal(t, user.Password, "updated-test-password")
 	})
 
-	t.Run("when attempt to update not exist user return error", func(t *testing.T) {
+	t.Run("when attempt to update not exist user should return error", func(t *testing.T) {
 		ctx := context.Background()
 		container := setupMongoDbContainer(t, ctx)
 		mongodbUri, err := container.Endpoint(ctx, "mongodb")

@@ -183,24 +183,27 @@ func (s *service) Login(
 func (s *service) UpdateUserById(
 	ctx context.Context,
 	userId string,
-	user *UpdateUserPayload,
+	updateUser *UpdateUserPayload,
 ) (*jwt_generator.Tokens, error) {
-	err := s.userRepository.UpdateUserById(ctx, userId, user)
+	var err error
+
+	err = s.userRepository.UpdateUserById(ctx, userId, updateUser)
 	if err != nil {
 		return nil, err
 	}
 
-	var userDocument *Document
-	userDocument, err = s.userRepository.FindUserWithId(ctx, userId)
+	var user *Document
+	user, err = s.userRepository.FindUserWithId(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
 
+	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
-	accessToken, err := s.jwtGenerator.GenerateAccessToken(
+	accessToken, err = s.jwtGenerator.GenerateAccessToken(
 		accessTokenExpiresAt,
-		userDocument.Name,
-		userDocument.Email,
+		user.Name,
+		user.Email,
 		userId,
 	)
 	if err != nil {
@@ -213,7 +216,7 @@ func (s *service) UpdateUserById(
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, userDocument.Id)
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, user.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
