@@ -200,28 +200,17 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, user *Up
 		UpdatedAt: time.Now().UTC(),
 	}
 
-	if userDocument.Email != "" {
-		count, err := collection.CountDocuments(ctx, &bson.M{"email": userDocument.Email})
-		if err != nil {
-			return cerror.NewError(
-				fiber.StatusInternalServerError,
-				"error occurred while find email address",
-				zap.Error(err),
-			)
-		}
-
-		if count > 0 {
+	update := bson.D{{"$set", userDocument}}
+	updateOptions := options.Update().SetUpsert(false)
+	result, err := collection.UpdateByID(ctx, userId, update, updateOptions)
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
 			return cerror.NewError(
 				fiber.StatusConflict,
 				"same email address already exist in user collection",
 			)
 		}
-	}
 
-	update := bson.D{{"$set", userDocument}}
-	updateOptions := options.Update().SetUpsert(false)
-	result, err := collection.UpdateByID(ctx, userId, update, updateOptions)
-	if err != nil {
 		return cerror.NewError(
 			fiber.StatusInternalServerError,
 			"error occurred while update user",

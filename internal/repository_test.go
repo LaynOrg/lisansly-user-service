@@ -923,6 +923,92 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		assert.Equal(t, user.Password, "updated-test-password")
 	})
 
+	t.Run("when attempt to update email field same email address already exist in collection should return error", func(t *testing.T) {
+		ctx := context.Background()
+		container := setupMongoDbContainer(t, ctx)
+		mongodbUri, err := container.Endpoint(ctx, "mongodb")
+		if err != nil {
+			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
+		}
+
+		client, err := mongo.Connect(context.TODO(), options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			}))
+		require.NoError(t, err)
+
+		credentials := options.Client().
+			ApplyURI(mongodbUri).
+			SetAuth(options.Credential{
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+			})
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		require.NoError(t, err)
+
+		defer func(mongoClient *mongo.Client, ctx context.Context) {
+			err := mongoClient.Disconnect(ctx)
+			require.NoError(t, err)
+		}(mongoClient, ctx)
+
+		collection := client.
+			Database(TestMongoDbDatabaseName).
+			Collection(TestMongoDbUserCollection)
+
+		_, err = collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+			Keys:    bson.M{"email": 1},
+			Options: options.Index().SetUnique(true),
+		})
+		require.NoError(t, err)
+
+		_, err = collection.
+			InsertOne(ctx, &Document{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     "test@test.com",
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC(),
+			})
+		require.NoError(t, err)
+
+		_, err = collection.
+			InsertOne(ctx, &Document{
+				Id:        "updateUser",
+				Name:      TestUserName,
+				Email:     "test2@test.com",
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC(),
+			})
+		require.NoError(t, err)
+
+		userRepository := NewRepository(
+			mongoClient,
+			config.MongodbConfig{
+				Uri:      mongodbUri,
+				Username: TestMongoDbUserName,
+				Password: TestMongoDbPassword,
+				Database: TestMongoDbDatabaseName,
+				Collections: map[string]string{
+					config.MongodbUserCollection: TestMongoDbUserCollection,
+				},
+			},
+		)
+
+		repositoryError := userRepository.UpdateUserById(ctx, "updateUser", &UpdateUserPayload{
+			Name:     "UPDATED-NAME",
+			Email:    "test@test.com",
+			Password: "updated-test-password",
+		})
+
+		assert.Error(t, repositoryError)
+		assert.Equal(t, http.StatusConflict, repositoryError.(cerror.CustomError).Code())
+	})
+
 	t.Run("when attempt to update not exist user should return error", func(t *testing.T) {
 		ctx := context.Background()
 		container := setupMongoDbContainer(t, ctx)
