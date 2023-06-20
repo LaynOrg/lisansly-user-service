@@ -20,8 +20,8 @@ type UpdateUserPayload struct {
 }
 
 type Document struct {
-	Id        string    `bson:"_id,,omitempty"`
-	Name      string    `json:"name,omitempty"`
+	Id        string    `bson:"_id,omitempty"`
+	Name      string    `bson:"name,omitempty"`
 	Email     string    `bson:"email,omitempty"`
 	Password  string    `bson:"password,omitempty"`
 	Role      string    `bson:"role,omitempty"`
