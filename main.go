@@ -47,8 +47,8 @@ func main() {
 
 	ctx := context.Background()
 	mongoDbClient := setupMongodbClient(cfg)
-	defer func(mongoClient *mongo.Client, ctx context.Context) {
-		err := mongoClient.Disconnect(ctx)
+	defer func(client *mongo.Client, ctx context.Context) {
+		err := client.Disconnect(ctx)
 		if err != nil {
 			panic(err)
 		}

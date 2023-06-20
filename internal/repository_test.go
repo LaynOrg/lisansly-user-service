@@ -57,8 +57,8 @@ func TestRepository_InsertUser(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -97,8 +97,8 @@ func TestRepository_InsertUser(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -134,8 +134,8 @@ func TestRepository_InsertUser(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -180,19 +180,19 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 				Password: TestMongoDbPassword,
 			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
+		client, err := mongo.Connect(ctx, credentials)
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
-		}(mongoClient, ctx)
+		}(client, ctx)
 
 		userRepository := NewRepository(
-			mongoClient,
+			client,
 			config.MongodbConfig{
 				Uri:      mongodbUri,
 				Username: TestMongoDbUserName,
@@ -228,8 +228,8 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -267,8 +267,8 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -308,24 +308,6 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
 		}
 
-		client, err := mongo.Connect(context.TODO(), options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			}))
-		require.NoError(t, err)
-
-		_, err = client.
-			Database(TestMongoDbDatabaseName).
-			Collection(TestMongoDbUserCollection).
-			InsertOne(ctx, &Document{
-				Email:    TestEmail,
-				Password: TestPassword,
-				Role:     RoleUser,
-			})
-		require.NoError(t, err)
-
 		credentials := options.Client().
 			ApplyURI(mongodbUri).
 			SetAuth(options.Credential{
@@ -337,12 +319,24 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
 		}(mongoClient, ctx)
+
+		collection := mongoClient.
+			Database(TestMongoDbDatabaseName).
+			Collection(TestMongoDbUserCollection)
+
+		_, err = collection.
+			InsertOne(ctx, &Document{
+				Email:    TestEmail,
+				Password: TestPassword,
+				Role:     RoleUser,
+			})
+		require.NoError(t, err)
 
 		userRepository := NewRepository(
 			mongoClient,
@@ -376,8 +370,8 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -409,8 +403,8 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -454,8 +448,8 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -519,8 +513,8 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -558,8 +552,8 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -591,8 +585,8 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -636,8 +630,8 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -701,8 +695,8 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -740,8 +734,8 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -773,8 +767,8 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -818,8 +812,8 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -885,8 +879,8 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		mongoClient, err := mongo.Connect(ctx, credentials)
 		require.NoError(t, err)
 
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			require.NoError(t, err)
 		}(mongoClient, ctx)
 
@@ -949,8 +943,8 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		mongoClient, err := mongo.Connect(ctx, credentials)
 		require.NoError(t, err)
 
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			require.NoError(t, err)
 		}(mongoClient, ctx)
 
@@ -1027,8 +1021,8 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		mongoClient, err := mongo.Connect(ctx, credentials)
 		require.NoError(t, err)
 
-		defer func(mongoClient *mongo.Client, ctx context.Context) {
-			err := mongoClient.Disconnect(ctx)
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
 			require.NoError(t, err)
 		}(mongoClient, ctx)
 
