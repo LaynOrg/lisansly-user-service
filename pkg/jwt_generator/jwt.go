@@ -13,7 +13,7 @@ import (
 
 type JwtGenerator interface {
 	GenerateAccessToken(expirationTime time.Time, name, email, userId string) (string, error)
-	GenerateRefreshToken() (string, error)
+	GenerateRefreshToken(expirationTime time.Time, userId string) (string, error)
 	VerifyAccessToken(rawJwtToken string) (*Claims, error)
 }
 
@@ -68,8 +68,17 @@ func (jwtGenerator *jwtGenerator) GenerateAccessToken(
 	return signedToken, nil
 }
 
-func (jwtGenerator *jwtGenerator) GenerateRefreshToken() (string, error) {
-	token := jwt.New(jwt.SigningMethodES256)
+func (jwtGenerator *jwtGenerator) GenerateRefreshToken(expirationTime time.Time, userId string) (string, error) {
+	now := time.Now().UTC()
+	claims := jwt.RegisteredClaims{
+		ID:        uuid.New().String(),
+		Issuer:    IssuerDefault,
+		Subject:   userId,
+		ExpiresAt: jwt.NewNumericDate(expirationTime),
+		IssuedAt:  jwt.NewNumericDate(now),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
 
 	signedToken, err := token.SignedString(jwtGenerator.privateKey)
 	if err != nil {

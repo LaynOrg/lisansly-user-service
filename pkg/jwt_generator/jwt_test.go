@@ -93,7 +93,8 @@ func TestJwtGenerator_GenerateRefreshToken(t *testing.T) {
 			PublicKey:  TestPublicKey,
 		})
 
-		token, err := jwtGenerator.GenerateRefreshToken()
+		expirationTime := time.Now().UTC().Add(24 * time.Hour)
+		token, err := jwtGenerator.GenerateRefreshToken(expirationTime, TestUserID)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, token)

@@ -50,18 +50,18 @@ func (mr *MockJwtGeneratorMockRecorder) GenerateAccessToken(expirationTime, name
 }
 
 // GenerateRefreshToken mocks base method.
-func (m *MockJwtGenerator) GenerateRefreshToken() (string, error) {
+func (m *MockJwtGenerator) GenerateRefreshToken(expirationTime time.Time, userId string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateRefreshToken")
+	ret := m.ctrl.Call(m, "GenerateRefreshToken", expirationTime, userId)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateRefreshToken indicates an expected call of GenerateRefreshToken.
-func (mr *MockJwtGeneratorMockRecorder) GenerateRefreshToken() *gomock.Call {
+func (mr *MockJwtGeneratorMockRecorder) GenerateRefreshToken(expirationTime, userId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateRefreshToken", reflect.TypeOf((*MockJwtGenerator)(nil).GenerateRefreshToken))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateRefreshToken", reflect.TypeOf((*MockJwtGenerator)(nil).GenerateRefreshToken), expirationTime, userId)
 }
 
 // VerifyAccessToken mocks base method.

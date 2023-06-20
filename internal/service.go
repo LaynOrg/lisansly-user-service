@@ -59,9 +59,9 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 		)
 	}
 
-	var userId string
+	userId := uuid.New().String()
 	userId, err = s.userRepository.InsertUser(ctx, &Document{
-		Id:        uuid.New().String(),
+		Id:        userId,
 		Name:      user.Name,
 		Email:     user.Email,
 		Password:  string(hashedPassword),
@@ -85,7 +85,7 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateRefreshToken()
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, userId)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -155,7 +155,7 @@ func (s *service) Login(
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateRefreshToken()
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, user.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -211,7 +211,9 @@ func (s *service) UpdateUserById(
 		)
 	}
 
-	refreshToken, err := s.jwtGenerator.GenerateRefreshToken()
+	var refreshToken string
+	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, userDocument.Id)
 	if err != nil {
 		return nil, cerror.NewError(
 			fiber.StatusInternalServerError,
@@ -220,7 +222,6 @@ func (s *service) UpdateUserById(
 		)
 	}
 
-	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
 		Id:        uuid.New().String(),
 		UserID:    userId,

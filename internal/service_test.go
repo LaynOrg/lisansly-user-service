@@ -160,7 +160,7 @@ func TestService_Register(t *testing.T) {
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateRefreshToken().
+			GenerateRefreshToken(gomock.Any(), TestUserId).
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
@@ -336,7 +336,7 @@ func TestService_Login(t *testing.T) {
 
 		mockJwtGenerator.
 			EXPECT().
-			GenerateRefreshToken().
+			GenerateRefreshToken(gomock.Any(), TestUserId).
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
