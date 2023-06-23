@@ -187,6 +187,20 @@ func (s *service) UpdateUserById(
 ) (*jwt_generator.Tokens, error) {
 	var err error
 
+	if updateUser.Password != "" {
+		var hashedPassword []byte
+		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(updateUser.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, cerror.NewError(
+				fiber.StatusInternalServerError,
+				"error occurred while generate hash from password",
+				zap.Error(err),
+			)
+		}
+
+		updateUser.Password = string(hashedPassword)
+	}
+
 	err = s.userRepository.UpdateUserById(ctx, userId, updateUser)
 	if err != nil {
 		return nil, err
