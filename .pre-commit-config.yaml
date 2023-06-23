@@ -2,10 +2,7 @@ repos:
   - repo: https://github.com/tekwizely/pre-commit-golang
     rev: v1.0.0-rc.1
     hooks:
-      - id: my-cmd-mod
-        name: unit test
-        alias: unit test
-        args: [make, test]
+      - id: go-test-repo-pkg
 
       - id: my-cmd-mod
         name: gosec
