@@ -133,3 +133,36 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  deploy-to-prod:
+    needs:
+      - deploy-to-dev
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.APP_NAME }}
+
+      - run: |
+          touch env.dev.json
+          echo '{
+            "IS_AT_REMOTE": true,
+            "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
+            "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
+            "MONGODB_URI": "${{ secrets.PROD_MONGODB_URI }}",
+            "MONGODB_USERNAME": "${{ secrets.PROD_MONGODB_USERNAME }}",
+            "MONGODB_PASSWORD": "${{ secrets.PROD_MONGODB_PASSWORD }}",
+            "MONGODB_DATABASE": "${{ vars.MONGODB_DATABASE }}",
+            "MONGODB_USER_COLLECTION": "${{ vars.MONGODB_USER_COLLECTION }}",
+            "MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION": "${{ vars.MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION }}"
+          }' > env.dev.json
+
+      - uses: serverless/github-action@v3.2
+        with:
+          args: deploy --stage dev
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
