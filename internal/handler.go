@@ -54,10 +54,11 @@ func (h *handler) AuthenticationMiddleware(ctx *fiber.Ctx) error {
 	authorizationHeader := requestHeaders[fiber.HeaderAuthorization]
 	authorizationHeaderLength := len([]rune(authorizationHeader))
 	if authorizationHeaderLength == 0 {
-		return cerror.NewError(
-			http.StatusUnauthorized,
-			"access token not found in authorization header",
-		).SetSeverity(zapcore.WarnLevel)
+		return &cerror.CustomError{
+			Code:        http.StatusUnauthorized,
+			LogMessage:  "access token not found in authorization header",
+			LogSeverity: zapcore.WarnLevel,
+		}
 	}
 
 	accessToken := authorizationHeader[7:authorizationHeaderLength]
@@ -86,19 +87,26 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 	var user *RegisterPayload
 	err = ctx.BodyParser(&user)
 	if err != nil {
-		return cerror.NewError(
-			fiber.StatusBadRequest,
-			"malformed request body",
-			zap.Any("body", ctx.Body()),
-		).SetSeverity(zap.WarnLevel)
+		return &cerror.CustomError{
+			Code:        http.StatusBadRequest,
+			LogMessage:  "malformed request body",
+			LogSeverity: zapcore.WarnLevel,
+			LogFields: []zapcore.Field{
+				zap.Any("body", ctx.Body()),
+			},
+		}
 	}
 
 	err = h.validate.Struct(user)
 	if err != nil {
-		return cerror.NewError(
-			fiber.StatusBadRequest,
-			"malformed request body",
-		).SetSeverity(zap.WarnLevel)
+		return &cerror.CustomError{
+			Code:        http.StatusBadRequest,
+			LogMessage:  "malformed request body",
+			LogSeverity: zapcore.WarnLevel,
+			LogFields: []zapcore.Field{
+				zap.Any("body", ctx.Body()),
+			},
+		}
 	}
 
 	var tokens *jwt_generator.Tokens
@@ -123,28 +131,34 @@ func (h *handler) UpdateUserById(ctx *fiber.Ctx) error {
 	var user *UpdateUserPayload
 	err = ctx.BodyParser(&user)
 	if err != nil {
-		return cerror.NewError(
-			fiber.StatusBadRequest,
-			"malformed request body",
-			zap.Any("body", ctx.Body()),
-		).SetSeverity(zap.WarnLevel)
+		return &cerror.CustomError{
+			Code:        http.StatusBadRequest,
+			LogMessage:  "malformed request body",
+			LogSeverity: zapcore.WarnLevel,
+			LogFields: []zapcore.Field{
+				zap.Any("body", ctx.Body()),
+			},
+		}
 	}
 
 	err = h.validate.Struct(user)
 	if err != nil {
-		return cerror.NewError(
-			fiber.StatusBadRequest,
-			"malformed request body",
-			zap.Any("body", ctx.Body()),
-		).SetSeverity(zap.WarnLevel)
+		return &cerror.CustomError{
+			Code:        http.StatusBadRequest,
+			LogMessage:  "malformed request body",
+			LogSeverity: zapcore.WarnLevel,
+			LogFields: []zapcore.Field{
+				zap.Any("body", ctx.Body()),
+			},
+		}
 	}
 
 	userId := ctx.Locals(ContextKeyUserId).(string)
 	if userId == "" {
-		return cerror.NewError(
-			fiber.StatusBadRequest,
-			"UserId context is empty",
-		)
+		return &cerror.CustomError{
+			Code:       http.StatusBadRequest,
+			LogMessage: "UserId context is empty",
+		}
 	}
 
 	var tokens *jwt_generator.Tokens
@@ -173,10 +187,11 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 
 	err = h.validate.Struct(user)
 	if err != nil {
-		return cerror.NewError(
-			fiber.StatusBadRequest,
-			"malformed request params",
-		).SetSeverity(zapcore.WarnLevel)
+		return &cerror.CustomError{
+			Code:        http.StatusBadRequest,
+			LogMessage:  "malformed request params",
+			LogSeverity: zapcore.WarnLevel,
+		}
 	}
 
 	var tokens *jwt_generator.Tokens

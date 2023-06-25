@@ -940,14 +940,6 @@ func TestRepository_UpdateUserById(t *testing.T) {
 				Password: TestMongoDbPassword,
 			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		require.NoError(t, err)
-
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			require.NoError(t, err)
-		}(mongoClient, ctx)
-
 		collection := client.
 			Database(TestMongoDbDatabaseName).
 			Collection(TestMongoDbUserCollection)
@@ -980,6 +972,17 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			})
 		require.NoError(t, err)
 
+		err = client.Disconnect(ctx)
+		require.NoError(t, err)
+
+		mongoClient, err := mongo.Connect(ctx, credentials)
+		require.NoError(t, err)
+
+		defer func(client *mongo.Client, ctx context.Context) {
+			err := client.Disconnect(ctx)
+			require.NoError(t, err)
+		}(mongoClient, ctx)
+
 		userRepository := NewRepository(
 			mongoClient,
 			config.MongodbConfig{
@@ -1000,7 +1003,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		})
 
 		assert.Error(t, repositoryError)
-		assert.Equal(t, http.StatusConflict, repositoryError.(cerror.CustomError).Code())
+		assert.Equal(t, http.StatusConflict, repositoryError.(*cerror.CustomError).Code)
 	})
 
 	t.Run("when attempt to update not exist user should return error", func(t *testing.T) {
@@ -1046,7 +1049,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		})
 
 		assert.Error(t, repositoryError)
-		assert.Equal(t, http.StatusNotFound, repositoryError.(cerror.CustomError).Code())
+		assert.Equal(t, http.StatusNotFound, repositoryError.(*cerror.CustomError).Code)
 	})
 }
 

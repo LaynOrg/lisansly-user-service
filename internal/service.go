@@ -43,20 +43,26 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	var hashedPassword []byte
 	hashedPassword, err = bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate hash from password",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate hash from password",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	createdAt := time.Now().UTC()
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while time parsing",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while time parsing",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	userId := uuid.New().String()
@@ -76,22 +82,28 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, userId)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate access token",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate access token",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
 	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, userId)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate refresh token",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate refresh token",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
@@ -124,44 +136,52 @@ func (s *service) Login(
 
 	user, err = s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
 	if err != nil {
-		statusCode := err.(cerror.CustomError).Code()
+		statusCode := err.(*cerror.CustomError).Code
 		if statusCode == fiber.StatusNotFound {
-			return nil, cerror.NewError(
-				fiber.StatusUnauthorized,
-				"user credentials invalid",
-			).SetSeverity(zap.WarnLevel)
+			return nil, &cerror.CustomError{
+				Code:        fiber.StatusUnauthorized,
+				LogMessage:  "user credentials invalid",
+				LogSeverity: zapcore.WarnLevel,
+			}
 		}
 		return nil, err
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(claimedUser.Password))
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusUnauthorized,
-			"error occurred while compare passwords",
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusUnauthorized,
+			LogMessage:  "error occurred while compare passwords",
+			LogSeverity: zapcore.WarnLevel,
+		}
 	}
 
 	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate access token",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate access token",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
 	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, user.Id)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate refresh token",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate refresh token",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
@@ -191,11 +211,14 @@ func (s *service) UpdateUserById(
 		var hashedPassword []byte
 		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(updateUser.Password), bcrypt.DefaultCost)
 		if err != nil {
-			return nil, cerror.NewError(
-				fiber.StatusInternalServerError,
-				"error occurred while generate hash from password",
-				zap.Error(err),
-			)
+			return nil, &cerror.CustomError{
+				Code:        fiber.StatusInternalServerError,
+				LogMessage:  "error occurred while generate hash from password",
+				LogSeverity: zapcore.ErrorLevel,
+				LogFields: []zap.Field{
+					zap.Error(err),
+				},
+			}
 		}
 
 		updateUser.Password = string(hashedPassword)
@@ -221,22 +244,28 @@ func (s *service) UpdateUserById(
 		userId,
 	)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate access token",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate access token",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
 	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, user.Id)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate refresh token",
-			zap.Error(err),
-		)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate refresh token",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
@@ -265,18 +294,20 @@ func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refr
 	}
 
 	if refreshTokenDocument.Token != refreshToken {
-		return "", cerror.NewError(
-			fiber.StatusForbidden,
-			"invalid refresh token",
-		).SetSeverity(zapcore.WarnLevel)
+		return "", &cerror.CustomError{
+			Code:        fiber.StatusForbidden,
+			LogMessage:  "invalid refresh token",
+			LogSeverity: zapcore.WarnLevel,
+		}
 	}
 
 	refreshTokenExpire := time.Now().UTC().After(refreshTokenDocument.ExpiresAt)
 	if refreshTokenExpire {
-		return "", cerror.NewError(
-			fiber.StatusForbidden,
-			"refresh token expired",
-		).SetSeverity(zapcore.WarnLevel)
+		return "", &cerror.CustomError{
+			Code:        fiber.StatusForbidden,
+			LogMessage:  "refresh token expired",
+			LogSeverity: zapcore.WarnLevel,
+		}
 	}
 
 	var user *Document
@@ -289,11 +320,14 @@ func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refr
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
-		return "", cerror.NewError(
-			fiber.StatusInternalServerError,
-			"error occurred while generate access token",
-			zap.Error(err),
-		)
+		return "", &cerror.CustomError{
+			Code:        fiber.StatusInternalServerError,
+			LogMessage:  "error occurred while generate access token",
+			LogSeverity: zapcore.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
 	return accessToken, nil
@@ -305,21 +339,23 @@ func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) (*j
 	var jwtClaims *jwt_generator.Claims
 	jwtClaims, err = s.jwtGenerator.VerifyAccessToken(accessToken)
 	if err != nil {
-		return nil, cerror.NewError(
-			fiber.StatusUnauthorized,
-			err.Error(),
-		).SetSeverity(zapcore.WarnLevel)
+		return nil, &cerror.CustomError{
+			Code:        fiber.StatusUnauthorized,
+			LogMessage:  err.(*cerror.CustomError).LogMessage,
+			LogSeverity: zapcore.WarnLevel,
+		}
 	}
 
 	userId := jwtClaims.Subject
 	_, err = s.userRepository.FindUserWithId(ctx, userId)
 	if err != nil {
-		statusCode := err.(cerror.CustomError).Code()
+		statusCode := err.(*cerror.CustomError).Code
 		if statusCode == fiber.StatusNotFound {
-			return nil, cerror.NewError(
-				fiber.StatusUnauthorized,
-				"user not found email in jwt claims",
-			).SetSeverity(zapcore.WarnLevel)
+			return nil, &cerror.CustomError{
+				Code:        fiber.StatusUnauthorized,
+				LogMessage:  "user not found email in jwt claims",
+				LogSeverity: zapcore.WarnLevel,
+			}
 		}
 
 		return nil, err

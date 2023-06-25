@@ -5,6 +5,7 @@ package user
 import (
 	"bytes"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -112,10 +113,11 @@ func TestHandler_AuthenticationMiddleware(t *testing.T) {
 			VerifyAccessToken(gomock.Any(), accessToken).
 			Return(
 				nil,
-				cerror.NewError(
-					http.StatusUnauthorized,
-					"access token is not valid",
-				),
+				&cerror.CustomError{
+					Code:        http.StatusUnauthorized,
+					LogMessage:  "access token is not valid",
+					LogSeverity: zapcore.ErrorLevel,
+				},
 			)
 
 		handler := NewHandler(mockUserService)
@@ -236,7 +238,11 @@ func TestHandler_Register(t *testing.T) {
 		mockUserService := NewMockService(mockController)
 		mockUserService.EXPECT().Register(gomock.Any(), &TestUserModel).Return(
 			nil,
-			cerror.NewError(fiber.StatusInternalServerError, "something went wrong"),
+			&cerror.CustomError{
+				Code:        fiber.StatusInternalServerError,
+				LogMessage:  "something went wrong",
+				LogSeverity: zapcore.ErrorLevel,
+			},
 		)
 
 		userHandler := NewHandler(mockUserService)
@@ -596,7 +602,11 @@ func TestHandler_Login(t *testing.T) {
 		mockUserService := NewMockService(mockController)
 		mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(
 			nil,
-			cerror.NewError(fiber.StatusInternalServerError, "something went wrong"),
+			&cerror.CustomError{
+				Code:        fiber.StatusInternalServerError,
+				LogMessage:  "something went wrong",
+				LogSeverity: zapcore.ErrorLevel,
+			},
 		)
 
 		userHandler := NewHandler(mockUserService)
@@ -645,13 +655,22 @@ func TestHandler_GetAccessTokenByRefreshToken(t *testing.T) {
 	})
 
 	t.Run("when user service return error should return it", func(t *testing.T) {
-		app := fiber.New()
+		app := fiber.New(fiber.Config{
+			ErrorHandler: cerror.Middleware,
+		})
 
 		mockUserService := NewMockService(mockController)
 		mockUserService.
 			EXPECT().
 			GetAccessTokenByRefreshToken(gomock.Any(), TestUserId, TestRefreshToken).
-			Return("", cerror.NewError(fiber.StatusInternalServerError, "something went wrong"))
+			Return(
+				"",
+				&cerror.CustomError{
+					Code:        fiber.StatusInternalServerError,
+					LogMessage:  "something went wrong",
+					LogSeverity: zapcore.ErrorLevel,
+				},
+			)
 
 		userHandler := NewHandler(mockUserService)
 		userHandler.RegisterRoutes(app)

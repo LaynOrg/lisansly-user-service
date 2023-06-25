@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gofiber/fiber/v2"
@@ -16,7 +17,6 @@ import (
 	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
 	"user-api/pkg/logger"
-	"user-api/pkg/path"
 	"user-api/pkg/server"
 )
 
@@ -25,7 +25,11 @@ func main() {
 
 	isAtRemote := os.Getenv(config.IsAtRemote)
 	if isAtRemote == "" {
-		rootDirectory := path.GetRootDirectory()
+		_, currentFile, _, _ := runtime.Caller(0)
+		rootDirectory := filepath.Join(
+			filepath.Dir(currentFile),
+			"../..",
+		)
 		dotenvPath := filepath.Join(rootDirectory, ".env")
 		err := godotenv.Load(dotenvPath)
 		if err != nil {

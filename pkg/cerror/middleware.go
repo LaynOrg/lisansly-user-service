@@ -12,7 +12,7 @@ import (
 const StackSkipAmount = 7
 
 func Middleware(ctx *fiber.Ctx, err error) error {
-	var cerr *customError
+	var cerr *CustomError
 	ok := errors.As(err, &cerr)
 	if !ok {
 		fiberError := err.(*fiber.Error)
@@ -20,15 +20,15 @@ func Middleware(ctx *fiber.Ctx, err error) error {
 	}
 
 	log := logger.FromContext(ctx.Context()).Desugar()
-	if len(cerr.Fields()) > 0 {
-		for _, field := range cerr.Fields() {
+	if len(cerr.LogFields) > 0 {
+		for _, field := range cerr.LogFields {
 			log = log.With(field)
 		}
 	}
 	log.WithOptions(
 		zap.WithCaller(false),
 		zap.AddCallerSkip(StackSkipAmount),
-	).Log(cerr.Severity(), cerr.Error())
+	).Log(cerr.LogSeverity, cerr.LogMessage)
 
-	return ctx.SendStatus(cerr.Code())
+	return ctx.SendStatus(cerr.Code)
 }

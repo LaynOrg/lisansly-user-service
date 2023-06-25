@@ -5,6 +5,7 @@ package user
 import (
 	"context"
 	"errors"
+	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"testing"
 	"time"
@@ -249,7 +250,13 @@ func TestService_Login(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithEmail(ctx, TestEmail).
-			Return(nil, cerror.NewError(http.StatusNotFound, "not found"))
+			Return(
+				nil,
+				&cerror.CustomError{
+					Code:        http.StatusNotFound,
+					LogMessage:  "not found",
+					LogSeverity: zapcore.ErrorLevel,
+				})
 
 		userService := NewService(mockUserRepository, nil)
 		_, err := userService.Login(ctx, &LoginPayload{
@@ -794,10 +801,12 @@ func TestService_VerifyAccessToken(t *testing.T) {
 		mockJwtGenerator.
 			EXPECT().
 			VerifyAccessToken(accessToken).
-			Return(nil, cerror.NewError(
-				http.StatusUnauthorized,
-				"expired jwt token",
-			).SetSeverity(zapcore.WarnLevel))
+			Return(nil,
+				&cerror.CustomError{
+					Code:        fiber.StatusUnauthorized,
+					LogMessage:  "expired jwt token",
+					LogSeverity: zapcore.WarnLevel,
+				})
 
 		ctx := context.Background()
 		service := NewService(nil, mockJwtGenerator)
@@ -841,10 +850,13 @@ func TestService_VerifyAccessToken(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithId(gomock.Any(), TestUserId).
-			Return(nil, cerror.NewError(
-				http.StatusNotFound,
-				"user not found",
-			).SetSeverity(zapcore.WarnLevel))
+			Return(
+				nil,
+				&cerror.CustomError{
+					Code:        fiber.StatusNotFound,
+					LogMessage:  "user not found",
+					LogSeverity: zapcore.WarnLevel,
+				})
 
 		ctx := context.Background()
 		service := NewService(mockUserRepository, mockJwtGenerator)
@@ -888,10 +900,13 @@ func TestService_VerifyAccessToken(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithId(gomock.Any(), TestUserId).
-			Return(nil, cerror.NewError(
-				http.StatusInternalServerError,
-				"error",
-			))
+			Return(
+				nil,
+				&cerror.CustomError{
+					Code:        fiber.StatusInternalServerError,
+					LogMessage:  "error",
+					LogSeverity: zapcore.ErrorLevel,
+				})
 
 		ctx := context.Background()
 		service := NewService(mockUserRepository, mockJwtGenerator)

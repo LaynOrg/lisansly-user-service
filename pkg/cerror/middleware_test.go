@@ -18,11 +18,14 @@ func TestMiddleware(t *testing.T) {
 			ErrorHandler: Middleware,
 		})
 		app.Get("/", func(ctx *fiber.Ctx) error {
-			return NewError(
-				fiber.StatusInternalServerError,
-				"something went wrong",
-				zap.String("key", "value"),
-			)
+			return &CustomError{
+				Code:        fiber.StatusInternalServerError,
+				LogMessage:  "something went wrong",
+				LogSeverity: zap.ErrorLevel,
+				LogFields: []zap.Field{
+					zap.String("key", "value"),
+				},
+			}
 		})
 
 		req, err := http.NewRequest(fiber.MethodGet, "/", nil)
