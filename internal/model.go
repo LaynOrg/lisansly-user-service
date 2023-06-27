@@ -14,9 +14,9 @@ type LoginPayload struct {
 }
 
 type UpdateUserPayload struct {
-	Name     string `json:"name,omitempty" validate:"required_without_all=Email Password|gt=0"`
-	Email    string `json:"email,omitempty" validate:"required_without_all=Name Password|email"`
-	Password string `json:"password,omitempty" validate:"required_without_all=Name Email|gte=10"`
+	Name     string `json:"name,omitempty" validate:"required_without_all=Email Password"`
+	Email    string `json:"email,omitempty" validate:"required_without_all=Name Password,email"`
+	Password string `json:"password,omitempty" validate:"required_without_all=Name Email,gte=10"`
 }
 
 type Document struct {

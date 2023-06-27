@@ -11,15 +11,15 @@ import (
 
 func TestReadConfig(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		os.Setenv(ServerPort, "8080")
-		os.Setenv(MongodbUri, "database-uri")
-		os.Setenv(MongodbUsername, "database-username")
-		os.Setenv(MongodbPassword, "database-password")
-		os.Setenv(MongodbDatabase, "database-database")
-		os.Setenv(MongodbUserCollection, "database-user-collection")
-		os.Setenv(MongoDbRefreshTokenHistoryCollection, "database-refresh-token-collection")
-		os.Setenv(JwtPrivateKey, "jwt-private-key")
-		os.Setenv(JwtPublicKey, "jwt-public-key")
+		_ = os.Setenv(ServerPort, "8080")
+		_ = os.Setenv(MongodbUri, "database-uri")
+		_ = os.Setenv(MongodbUsername, "database-username")
+		_ = os.Setenv(MongodbPassword, "database-password")
+		_ = os.Setenv(MongodbDatabase, "database-database")
+		_ = os.Setenv(MongodbUserCollection, "database-user-collection")
+		_ = os.Setenv(MongoDbRefreshTokenHistoryCollection, "database-refresh-token-collection")
+		_ = os.Setenv(JwtPrivateKey, "jwt-private-key")
+		_ = os.Setenv(JwtPublicKey, "jwt-public-key")
 		defer os.Clearenv()
 
 		config, err := ReadConfig()
@@ -29,14 +29,14 @@ func TestReadConfig(t *testing.T) {
 	})
 
 	t.Run("when server port is empty should return config", func(t *testing.T) {
-		os.Setenv(MongodbUri, "database-uri")
-		os.Setenv(MongodbUsername, "database-username")
-		os.Setenv(MongodbPassword, "database-password")
-		os.Setenv(MongodbDatabase, "database-database")
-		os.Setenv(MongodbUserCollection, "database-user-collection")
-		os.Setenv(MongoDbRefreshTokenHistoryCollection, "database-refresh-token-collection")
-		os.Setenv(JwtPrivateKey, "jwt-private-key")
-		os.Setenv(JwtPublicKey, "jwt-public-key")
+		_ = os.Setenv(MongodbUri, "database-uri")
+		_ = os.Setenv(MongodbUsername, "database-username")
+		_ = os.Setenv(MongodbPassword, "database-password")
+		_ = os.Setenv(MongodbDatabase, "database-database")
+		_ = os.Setenv(MongodbUserCollection, "database-user-collection")
+		_ = os.Setenv(MongoDbRefreshTokenHistoryCollection, "database-refresh-token-collection")
+		_ = os.Setenv(JwtPrivateKey, "jwt-private-key")
+		_ = os.Setenv(JwtPublicKey, "jwt-public-key")
 		defer os.Clearenv()
 
 		config, err := ReadConfig()
@@ -47,12 +47,12 @@ func TestReadConfig(t *testing.T) {
 }
 
 func TestReadMongoDbConfig(t *testing.T) {
-	os.Setenv(MongodbUri, "database-uri")
-	os.Setenv(MongodbUsername, "database-username")
-	os.Setenv(MongodbPassword, "database-password")
-	os.Setenv(MongodbDatabase, "database-database")
-	os.Setenv(MongodbUserCollection, "database-user-collection")
-	os.Setenv(MongoDbRefreshTokenHistoryCollection, "database-refresh-token-collection")
+	_ = os.Setenv(MongodbUri, "database-uri")
+	_ = os.Setenv(MongodbUsername, "database-username")
+	_ = os.Setenv(MongodbPassword, "database-password")
+	_ = os.Setenv(MongodbDatabase, "database-database")
+	_ = os.Setenv(MongodbUserCollection, "database-user-collection")
+	_ = os.Setenv(MongoDbRefreshTokenHistoryCollection, "database-refresh-token-collection")
 	defer os.Clearenv()
 
 	mongoConfig, err := ReadMongoDbConfig()
@@ -62,8 +62,8 @@ func TestReadMongoDbConfig(t *testing.T) {
 }
 
 func TestReadJwtConfig(t *testing.T) {
-	os.Setenv(JwtPrivateKey, "jwt-private-key")
-	os.Setenv(JwtPublicKey, "jwt-public-key")
+	_ = os.Setenv(JwtPrivateKey, "jwt-private-key")
+	_ = os.Setenv(JwtPublicKey, "jwt-public-key")
 	defer os.Clearenv()
 
 	jwtConfig, err := ReadJwtConfig()

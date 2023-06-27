@@ -5,11 +5,12 @@ package jwt_generator
 import (
 	"testing"
 	"time"
-	"user-api/pkg/config"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"user-api/pkg/config"
 )
 
 const (
@@ -36,7 +37,7 @@ EYx9LACT245DA8dJJMx5TXP1wtoFwCBLAORaw/fHr0X8MHUEstfqh3cTTg==
 
 func TestNewJwtGenerator(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		jwtGenerator, err := NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -46,7 +47,7 @@ func TestNewJwtGenerator(t *testing.T) {
 	})
 
 	t.Run("ambiguous ec256 private key", func(t *testing.T) {
-		jwtGenerator, err := NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestAmbiguousKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -56,7 +57,7 @@ func TestNewJwtGenerator(t *testing.T) {
 	})
 
 	t.Run("ambiguous ec256 private key", func(t *testing.T) {
-		jwtGenerator, err := NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestAmbiguousKey,
 		})
@@ -68,7 +69,7 @@ func TestNewJwtGenerator(t *testing.T) {
 
 func TestJwtGenerator_GenerateAccessToken(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		jwtGenerator, err := NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -88,7 +89,7 @@ func TestJwtGenerator_GenerateAccessToken(t *testing.T) {
 
 func TestJwtGenerator_GenerateRefreshToken(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		jwtGenerator, err := NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -103,7 +104,7 @@ func TestJwtGenerator_GenerateRefreshToken(t *testing.T) {
 
 func TestJwtGenerator_VerifyAccessToken(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		jwtGenerator, err := NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})

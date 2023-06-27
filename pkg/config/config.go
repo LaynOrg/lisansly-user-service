@@ -10,8 +10,8 @@ import (
 
 type Config struct {
 	ServerPort string
-	Mongodb    MongodbConfig
-	Jwt        JwtConfig
+	Mongodb    *MongodbConfig
+	Jwt        *JwtConfig
 }
 
 func ReadConfig() (*Config, error) {
@@ -41,38 +41,38 @@ func (c *Config) Print() {
 	_, _ = pretty.Println(c)
 }
 
-func ReadMongoDbConfig() (MongodbConfig, error) {
+func ReadMongoDbConfig() (*MongodbConfig, error) {
 	mongodbUri := os.Getenv(MongodbUri)
 	if mongodbUri == "" {
-		return MongodbConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, MongodbUri)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, MongodbUri)
 	}
 
 	mongodbUsername := os.Getenv(MongodbUsername)
 	if mongodbUsername == "" {
-		return MongodbConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, MongodbUsername)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, MongodbUsername)
 	}
 
 	mongodbPassword := os.Getenv(MongodbPassword)
 	if mongodbUsername == "" {
-		return MongodbConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, MongodbPassword)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, MongodbPassword)
 	}
 
 	mongodbDatabase := os.Getenv(MongodbDatabase)
 	if mongodbDatabase == "" {
-		return MongodbConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, MongodbDatabase)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, MongodbDatabase)
 	}
 
 	mongodbUserCollection := os.Getenv(MongodbUserCollection)
 	if mongodbUserCollection == "" {
-		return MongodbConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, MongodbUserCollection)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, MongodbUserCollection)
 	}
 
 	mongoDbRefreshTokenHistoryCollection := os.Getenv(MongoDbRefreshTokenHistoryCollection)
 	if mongodbUserCollection == "" {
-		return MongodbConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, MongoDbRefreshTokenHistoryCollection)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, MongoDbRefreshTokenHistoryCollection)
 	}
 
-	return MongodbConfig{
+	return &MongodbConfig{
 		Uri:      mongodbUri,
 		Username: mongodbUsername,
 		Password: mongodbPassword,
@@ -84,20 +84,20 @@ func ReadMongoDbConfig() (MongodbConfig, error) {
 	}, nil
 }
 
-func ReadJwtConfig() (JwtConfig, error) {
+func ReadJwtConfig() (*JwtConfig, error) {
 	privateKey := os.Getenv(JwtPrivateKey)
 	if privateKey == "" {
-		return JwtConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, JwtPrivateKey)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, JwtPrivateKey)
 	}
 	privateKey = strings.ReplaceAll(privateKey, `\n`, "\n")
 
 	publicKey := os.Getenv(JwtPublicKey)
 	if publicKey == "" {
-		return JwtConfig{}, fmt.Errorf(EnvironmentVariableNotDefined, JwtPublicKey)
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, JwtPublicKey)
 	}
 	publicKey = strings.ReplaceAll(publicKey, `\n`, "\n")
 
-	return JwtConfig{
+	return &JwtConfig{
 		PrivateKey: []byte(privateKey),
 		PublicKey:  []byte(publicKey),
 	}, nil

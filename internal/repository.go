@@ -26,12 +26,12 @@ type Repository interface {
 
 type repository struct {
 	mongoClient   *mongo.Client
-	mongoDbConfig config.MongodbConfig
+	mongoDbConfig *config.MongodbConfig
 }
 
 func NewRepository(
 	mongoClient *mongo.Client,
-	mongoDbConfig config.MongodbConfig,
+	mongoDbConfig *config.MongodbConfig,
 ) Repository {
 	return &repository{
 		mongoClient:   mongoClient,

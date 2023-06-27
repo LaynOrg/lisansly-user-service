@@ -5,11 +5,11 @@ package user
 import (
 	"context"
 	"errors"
-	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -80,7 +80,7 @@ func TestService_Register(t *testing.T) {
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
 			Return(nil)
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -187,7 +187,7 @@ func TestService_Register(t *testing.T) {
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
 			Return(errors.New("something went wrong"))
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -227,7 +227,7 @@ func TestService_Login(t *testing.T) {
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
 			Return(nil)
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -374,7 +374,7 @@ func TestService_Login(t *testing.T) {
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
 			Return(errors.New("something went wrong"))
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -423,7 +423,7 @@ func TestService_UpdateUserById(t *testing.T) {
 			InsertRefreshTokenHistory(gomock.Any(), gomock.Any()).
 			Return(nil)
 
-		jwtGenerator, _ := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, _ := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -564,7 +564,7 @@ func TestService_UpdateUserById(t *testing.T) {
 			InsertRefreshTokenHistory(gomock.Any(), gomock.Any()).
 			Return(errors.New("insert refresh token error"))
 
-		jwtGenerator, _ := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, _ := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -608,7 +608,7 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 				CreatedAt: time.Now().UTC(),
 			}, nil)
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -750,7 +750,7 @@ func TestService_VerifyAccessToken(t *testing.T) {
 	defer mockController.Finish()
 
 	t.Run("happy path", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -790,7 +790,7 @@ func TestService_VerifyAccessToken(t *testing.T) {
 	})
 
 	t.Run("when jwt is not valid should return error", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -822,7 +822,7 @@ func TestService_VerifyAccessToken(t *testing.T) {
 	})
 
 	t.Run("when user can't find by user id should return error", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})
@@ -869,7 +869,7 @@ func TestService_VerifyAccessToken(t *testing.T) {
 	})
 
 	t.Run("when error occurred find user by user id should return error", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(config.JwtConfig{
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
 			PublicKey:  TestPublicKey,
 		})

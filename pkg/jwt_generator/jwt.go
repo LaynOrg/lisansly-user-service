@@ -22,7 +22,7 @@ type jwtGenerator struct {
 	publicKey  *ecdsa.PublicKey
 }
 
-func NewJwtGenerator(jwtConfig config.JwtConfig) (JwtGenerator, error) {
+func NewJwtGenerator(jwtConfig *config.JwtConfig) (JwtGenerator, error) {
 	parsedEC256PrivateKey, err := jwt.ParseECPrivateKeyFromPEM(jwtConfig.PrivateKey)
 	if err != nil {
 		return nil, err
