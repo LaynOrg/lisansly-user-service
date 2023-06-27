@@ -12,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
 
 	user "user-api/internal"
 	"user-api/pkg/config"
@@ -21,19 +22,26 @@ import (
 )
 
 func main() {
-	log := logger.NewLogger()
+	logWithProductionConfig, _ := zap.NewProduction()
+	log := logWithProductionConfig.Sugar()
+	defer func(l *zap.Logger) {
+		err := l.Sync()
+		if err != nil {
+			panic(err)
+		}
+	}(logWithProductionConfig)
 
 	isAtRemote := os.Getenv(config.IsAtRemote)
 	if isAtRemote == "" {
 		_, currentFile, _, _ := runtime.Caller(0)
-		rootDirectory := filepath.Join(
-			filepath.Dir(currentFile),
-			"../..",
-		)
+		rootDirectory := filepath.Join(filepath.Dir(currentFile), "../..")
 		dotenvPath := filepath.Join(rootDirectory, ".env")
 		err := godotenv.Load(dotenvPath)
 		if err != nil {
-			panic(err)
+			log.Fatalw(
+				"failed to load .env file",
+				zap.Error(err),
+			)
 		}
 	}
 
@@ -46,15 +54,28 @@ func main() {
 	var jwtGenerator jwt_generator.JwtGenerator
 	jwtGenerator, err = jwt_generator.NewJwtGenerator(cfg.Jwt)
 	if err != nil {
-		panic(err)
+		log.Fatalw(
+			"failed to create jwt generator",
+			zap.Error(err),
+		)
 	}
 
 	ctx := context.Background()
-	mongoDbClient := setupMongodbClient(cfg)
+	mongoDbClient, err := setupMongodbClient(cfg)
+	if err != nil {
+		log.Fatalw(
+			"failed to setup mongodb client",
+			zap.Error(err),
+		)
+	}
+
 	defer func(client *mongo.Client, ctx context.Context) {
 		err := client.Disconnect(ctx)
 		if err != nil {
-			panic(err)
+			log.Fatalw(
+				"failed to disconnect mongodb client",
+				zap.Error(err),
+			)
 		}
 	}(mongoDbClient, ctx)
 
@@ -86,7 +107,7 @@ func main() {
 	}
 }
 
-func setupMongodbClient(cfg *config.Config) *mongo.Client {
+func setupMongodbClient(cfg *config.Config) (*mongo.Client, error) {
 	mongodbCredential := options.Credential{
 		Username: cfg.Mongodb.Username,
 		Password: cfg.Mongodb.Password,
@@ -100,8 +121,8 @@ func setupMongodbClient(cfg *config.Config) *mongo.Client {
 	ctx := context.Background()
 	mongodbClient, err := mongo.Connect(ctx, credentials)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return mongodbClient
+	return mongodbClient, nil
 }

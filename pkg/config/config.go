@@ -18,7 +18,6 @@ func ReadConfig() (*Config, error) {
 	serverPort := os.Getenv(ServerPort)
 	if serverPort == "" {
 		serverPort = "8080"
-		fmt.Println("server port environment variable is empty its declared 8080 by default")
 	}
 
 	mongodbConfig, err := ReadMongoDbConfig()

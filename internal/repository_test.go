@@ -1003,7 +1003,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		})
 
 		assert.Error(t, repositoryError)
-		assert.Equal(t, http.StatusConflict, repositoryError.(*cerror.CustomError).Code)
+		assert.Equal(t, http.StatusConflict, repositoryError.(*cerror.CustomError).HttpStatusCode)
 	})
 
 	t.Run("when attempt to update not exist user should return error", func(t *testing.T) {
@@ -1049,7 +1049,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 		})
 
 		assert.Error(t, repositoryError)
-		assert.Equal(t, http.StatusNotFound, repositoryError.(*cerror.CustomError).Code)
+		assert.Equal(t, http.StatusNotFound, repositoryError.(*cerror.CustomError).HttpStatusCode)
 	})
 }
 

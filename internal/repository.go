@@ -50,9 +50,9 @@ func (r *repository) InsertUser(ctx context.Context, user *Document) (string, er
 	err := collection.FindOne(ctx, &filter).Decode(&foundUser)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return "", &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while user existing check",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while user existing check",
+			LogSeverity:    zapcore.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -61,18 +61,18 @@ func (r *repository) InsertUser(ctx context.Context, user *Document) (string, er
 
 	if foundUser != nil {
 		return "", &cerror.CustomError{
-			Code:        fiber.StatusConflict,
-			LogMessage:  "user already exists",
-			LogSeverity: zapcore.WarnLevel,
+			HttpStatusCode: fiber.StatusConflict,
+			LogMessage:     "user already exists",
+			LogSeverity:    zapcore.WarnLevel,
 		}
 	}
 
 	result, err := collection.InsertOne(ctx, user)
 	if err != nil {
 		return "", &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while insert user",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while insert user",
+			LogSeverity:    zapcore.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -82,9 +82,9 @@ func (r *repository) InsertUser(ctx context.Context, user *Document) (string, er
 	userID, ok := result.InsertedID.(string)
 	if !ok {
 		return "", &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while type casting for user id",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while type casting for user id",
+			LogSeverity:    zapcore.ErrorLevel,
 		}
 	}
 
@@ -102,9 +102,9 @@ func (r *repository) InsertRefreshTokenHistory(
 	_, err := collection.InsertOne(ctx, refreshTokenHistory)
 	if err != nil {
 		return &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while insert refresh token",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while insert refresh token",
+			LogSeverity:    zapcore.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -125,17 +125,13 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Docu
 	err := collection.FindOne(ctx, &filter).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, &cerror.CustomError{
-				Code:        fiber.StatusNotFound,
-				LogMessage:  "user not found",
-				LogSeverity: zapcore.WarnLevel,
-			}
+			return nil, cerror.ErrorNotFound
 		}
 
 		return nil, &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while find user with email",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while find user with email",
+			LogSeverity:    zapcore.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -156,17 +152,13 @@ func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Docume
 	err := collection.FindOne(ctx, &filter).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, &cerror.CustomError{
-				Code:        fiber.StatusNotFound,
-				LogMessage:  "user not found",
-				LogSeverity: zapcore.WarnLevel,
-			}
+			return nil, cerror.ErrorNotFound
 		}
 
 		return nil, &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while find user with id",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while find user with id",
+			LogSeverity:    zapcore.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -191,16 +183,16 @@ func (r *repository) FindRefreshTokenWithUserId(
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, &cerror.CustomError{
-				Code:        fiber.StatusNotFound,
-				LogMessage:  "refresh token not found",
-				LogSeverity: zapcore.WarnLevel,
+				HttpStatusCode: fiber.StatusNotFound,
+				LogMessage:     "refresh token not found",
+				LogSeverity:    zapcore.WarnLevel,
 			}
 		}
 
 		return nil, &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while find refresh token",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while find refresh token",
+			LogSeverity:    zapcore.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -229,16 +221,16 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, user *Up
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return &cerror.CustomError{
-				Code:        fiber.StatusConflict,
-				LogMessage:  "same email address already exist in user collection",
-				LogSeverity: zapcore.WarnLevel,
+				HttpStatusCode: fiber.StatusConflict,
+				LogMessage:     "same email address already exist in user collection",
+				LogSeverity:    zapcore.WarnLevel,
 			}
 		}
 
 		return &cerror.CustomError{
-			Code:        fiber.StatusInternalServerError,
-			LogMessage:  "error occurred while update user",
-			LogSeverity: zapcore.ErrorLevel,
+			HttpStatusCode: fiber.StatusInternalServerError,
+			LogMessage:     "error occurred while update user",
+			LogSeverity:    zapcore.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -246,11 +238,7 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, user *Up
 	}
 
 	if result.ModifiedCount == 0 {
-		return &cerror.CustomError{
-			Code:        fiber.StatusNotFound,
-			LogMessage:  "user not found",
-			LogSeverity: zapcore.WarnLevel,
-		}
+		return cerror.ErrorNotFound
 	}
 
 	return nil

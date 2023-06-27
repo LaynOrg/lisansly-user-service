@@ -19,9 +19,9 @@ func TestMiddleware(t *testing.T) {
 		})
 		app.Get("/", func(ctx *fiber.Ctx) error {
 			return &CustomError{
-				Code:        fiber.StatusInternalServerError,
-				LogMessage:  "something went wrong",
-				LogSeverity: zap.ErrorLevel,
+				HttpStatusCode: fiber.StatusInternalServerError,
+				LogMessage:     "something went wrong",
+				LogSeverity:    zap.ErrorLevel,
 				LogFields: []zap.Field{
 					zap.String("key", "value"),
 				},

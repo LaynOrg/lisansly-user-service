@@ -114,9 +114,9 @@ func TestHandler_AuthenticationMiddleware(t *testing.T) {
 			Return(
 				nil,
 				&cerror.CustomError{
-					Code:        http.StatusUnauthorized,
-					LogMessage:  "access token is not valid",
-					LogSeverity: zapcore.ErrorLevel,
+					HttpStatusCode: http.StatusUnauthorized,
+					LogMessage:     "access token is not valid",
+					LogSeverity:    zapcore.ErrorLevel,
 				},
 			)
 
@@ -239,9 +239,9 @@ func TestHandler_Register(t *testing.T) {
 		mockUserService.EXPECT().Register(gomock.Any(), &TestUserModel).Return(
 			nil,
 			&cerror.CustomError{
-				Code:        fiber.StatusInternalServerError,
-				LogMessage:  "something went wrong",
-				LogSeverity: zapcore.ErrorLevel,
+				HttpStatusCode: fiber.StatusInternalServerError,
+				LogMessage:     "something went wrong",
+				LogSeverity:    zapcore.ErrorLevel,
 			},
 		)
 
@@ -603,9 +603,9 @@ func TestHandler_Login(t *testing.T) {
 		mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(
 			nil,
 			&cerror.CustomError{
-				Code:        fiber.StatusInternalServerError,
-				LogMessage:  "something went wrong",
-				LogSeverity: zapcore.ErrorLevel,
+				HttpStatusCode: fiber.StatusInternalServerError,
+				LogMessage:     "something went wrong",
+				LogSeverity:    zapcore.ErrorLevel,
 			},
 		)
 
@@ -666,9 +666,9 @@ func TestHandler_GetAccessTokenByRefreshToken(t *testing.T) {
 			Return(
 				"",
 				&cerror.CustomError{
-					Code:        fiber.StatusInternalServerError,
-					LogMessage:  "something went wrong",
-					LogSeverity: zapcore.ErrorLevel,
+					HttpStatusCode: fiber.StatusInternalServerError,
+					LogMessage:     "something went wrong",
+					LogSeverity:    zapcore.ErrorLevel,
 				},
 			)
 

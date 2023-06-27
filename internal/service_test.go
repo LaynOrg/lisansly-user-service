@@ -253,9 +253,9 @@ func TestService_Login(t *testing.T) {
 			Return(
 				nil,
 				&cerror.CustomError{
-					Code:        http.StatusNotFound,
-					LogMessage:  "not found",
-					LogSeverity: zapcore.ErrorLevel,
+					HttpStatusCode: http.StatusNotFound,
+					LogMessage:     "not found",
+					LogSeverity:    zapcore.ErrorLevel,
 				})
 
 		userService := NewService(mockUserRepository, nil)
@@ -460,7 +460,10 @@ func TestService_UpdateUserById(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithId(gomock.Any(), TestUserId).
-			Return(nil, errors.New("user not found"))
+			Return(
+				nil,
+				cerror.ErrorNotFound,
+			)
 
 		ctx := context.Background()
 		service := NewService(mockUserRepository, nil)
@@ -803,9 +806,9 @@ func TestService_VerifyAccessToken(t *testing.T) {
 			VerifyAccessToken(accessToken).
 			Return(nil,
 				&cerror.CustomError{
-					Code:        fiber.StatusUnauthorized,
-					LogMessage:  "expired jwt token",
-					LogSeverity: zapcore.WarnLevel,
+					HttpStatusCode: fiber.StatusUnauthorized,
+					LogMessage:     "expired jwt token",
+					LogSeverity:    zapcore.WarnLevel,
 				})
 
 		ctx := context.Background()
@@ -852,11 +855,8 @@ func TestService_VerifyAccessToken(t *testing.T) {
 			FindUserWithId(gomock.Any(), TestUserId).
 			Return(
 				nil,
-				&cerror.CustomError{
-					Code:        fiber.StatusNotFound,
-					LogMessage:  "user not found",
-					LogSeverity: zapcore.WarnLevel,
-				})
+				cerror.ErrorNotFound,
+			)
 
 		ctx := context.Background()
 		service := NewService(mockUserRepository, mockJwtGenerator)
@@ -903,9 +903,9 @@ func TestService_VerifyAccessToken(t *testing.T) {
 			Return(
 				nil,
 				&cerror.CustomError{
-					Code:        fiber.StatusInternalServerError,
-					LogMessage:  "error",
-					LogSeverity: zapcore.ErrorLevel,
+					HttpStatusCode: fiber.StatusInternalServerError,
+					LogMessage:     "error",
+					LogSeverity:    zapcore.ErrorLevel,
 				})
 
 		ctx := context.Background()

@@ -55,9 +55,9 @@ func (h *handler) AuthenticationMiddleware(ctx *fiber.Ctx) error {
 	authorizationHeaderLength := len([]rune(authorizationHeader))
 	if authorizationHeaderLength == 0 {
 		return &cerror.CustomError{
-			Code:        http.StatusUnauthorized,
-			LogMessage:  "access token not found in authorization header",
-			LogSeverity: zapcore.WarnLevel,
+			HttpStatusCode: http.StatusUnauthorized,
+			LogMessage:     "access token not found in authorization header",
+			LogSeverity:    zapcore.WarnLevel,
 		}
 	}
 
@@ -87,26 +87,22 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 	var user *RegisterPayload
 	err = ctx.BodyParser(&user)
 	if err != nil {
-		return &cerror.CustomError{
-			Code:        http.StatusBadRequest,
-			LogMessage:  "malformed request body",
-			LogSeverity: zapcore.WarnLevel,
-			LogFields: []zapcore.Field{
-				zap.Any("body", ctx.Body()),
-			},
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zapcore.Field{
+			zap.Any("body", ctx.Body()),
 		}
+
+		return cerr
 	}
 
 	err = h.validate.Struct(user)
 	if err != nil {
-		return &cerror.CustomError{
-			Code:        http.StatusBadRequest,
-			LogMessage:  "malformed request body",
-			LogSeverity: zapcore.WarnLevel,
-			LogFields: []zapcore.Field{
-				zap.Any("body", ctx.Body()),
-			},
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zapcore.Field{
+			zap.Any("body", ctx.Body()),
 		}
+
+		return cerr
 	}
 
 	var tokens *jwt_generator.Tokens
@@ -115,7 +111,7 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	log.Info("event successfully finished")
+	log.Info(logger.EventFinishedSuccessfully)
 	return ctx.
 		Status(fiber.StatusCreated).
 		JSON(tokens)
@@ -131,33 +127,28 @@ func (h *handler) UpdateUserById(ctx *fiber.Ctx) error {
 	var user *UpdateUserPayload
 	err = ctx.BodyParser(&user)
 	if err != nil {
-		return &cerror.CustomError{
-			Code:        http.StatusBadRequest,
-			LogMessage:  "malformed request body",
-			LogSeverity: zapcore.WarnLevel,
-			LogFields: []zapcore.Field{
-				zap.Any("body", ctx.Body()),
-			},
+		err = cerror.ErrorBadRequest
+		err.(*cerror.CustomError).LogFields = []zapcore.Field{
+			zap.Any("body", ctx.Body()),
 		}
+		return err
 	}
 
 	err = h.validate.Struct(user)
 	if err != nil {
-		return &cerror.CustomError{
-			Code:        http.StatusBadRequest,
-			LogMessage:  "malformed request body",
-			LogSeverity: zapcore.WarnLevel,
-			LogFields: []zapcore.Field{
-				zap.Any("body", ctx.Body()),
-			},
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zapcore.Field{
+			zap.Any("body", ctx.Body()),
 		}
+
+		return cerr
 	}
 
 	userId := ctx.Locals(ContextKeyUserId).(string)
 	if userId == "" {
 		return &cerror.CustomError{
-			Code:       http.StatusBadRequest,
-			LogMessage: "UserId context is empty",
+			HttpStatusCode: http.StatusBadRequest,
+			LogMessage:     "UserId context is empty",
 		}
 	}
 
@@ -167,7 +158,7 @@ func (h *handler) UpdateUserById(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	log.Info("event successfully finished")
+	log.Info(logger.EventFinishedSuccessfully)
 	return ctx.
 		Status(fiber.StatusOK).
 		JSON(tokens)
@@ -187,11 +178,12 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 
 	err = h.validate.Struct(user)
 	if err != nil {
-		return &cerror.CustomError{
-			Code:        http.StatusBadRequest,
-			LogMessage:  "malformed request params",
-			LogSeverity: zapcore.WarnLevel,
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zapcore.Field{
+			zap.Any("param", ctx.AllParams()),
 		}
+
+		return cerr
 	}
 
 	var tokens *jwt_generator.Tokens
@@ -200,7 +192,7 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	log.Info("event successfully finished")
+	log.Info(logger.EventFinishedSuccessfully)
 	return ctx.
 		Status(http.StatusOK).
 		JSON(tokens)
@@ -222,7 +214,7 @@ func (h *handler) GetAccessTokenByRefreshToken(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	log.Info("event successfully finished")
+	log.Info(logger.EventFinishedSuccessfully)
 	return ctx.
 		Status(fiber.StatusOK).
 		JSON(fiber.Map{

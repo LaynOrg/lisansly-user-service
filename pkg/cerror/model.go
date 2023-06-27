@@ -7,8 +7,8 @@ import (
 
 type CustomError struct {
 	error
-	Code        int
-	LogMessage  string
-	LogSeverity zapcore.Level
-	LogFields   []zap.Field
+	HttpStatusCode int
+	LogMessage     string
+	LogSeverity    zapcore.Level
+	LogFields      []zap.Field
 }

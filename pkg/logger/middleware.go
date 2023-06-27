@@ -8,24 +8,28 @@ import (
 	"go.uber.org/zap"
 )
 
-const ContextKey = "logger"
+const (
+	ContextKey                = "logger"
+	EventFinishedSuccessfully = "event successfully finished"
+)
 
-func Middleware(logger Logger) func(ctx *fiber.Ctx) error {
+func Middleware(logger *zap.SugaredLogger) func(ctx *fiber.Ctx) error {
 	return func(ctx *fiber.Ctx) error {
 		ctx.Locals(ContextKey, logger)
 		return ctx.Next()
 	}
 }
 
-func FromContext(ctx context.Context) Logger {
+func FromContext(ctx context.Context) *zap.SugaredLogger {
 	var (
-		logger Logger
+		logger *zap.SugaredLogger
 		isOk   bool
 	)
 
-	logger, isOk = ctx.Value(ContextKey).(Logger)
+	logger, isOk = ctx.Value(ContextKey).(*zap.SugaredLogger)
 	if !isOk {
-		logger = NewLogger()
+		l, _ := zap.NewProduction()
+		logger = l.Sugar()
 	}
 
 	var lambdaCtx *lambdacontext.LambdaContext
@@ -37,6 +41,6 @@ func FromContext(ctx context.Context) Logger {
 	return logger
 }
 
-func InjectContext(ctx context.Context, log Logger) context.Context {
+func InjectContext(ctx context.Context, log *zap.SugaredLogger) context.Context {
 	return context.WithValue(ctx, ContextKey, log)
 }
