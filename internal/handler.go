@@ -1,8 +1,6 @@
 package user
 
 import (
-	"net/http"
-
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
@@ -16,68 +14,36 @@ import (
 
 type Handler interface {
 	server.Handler
-	AuthenticationMiddleware(ctx *fiber.Ctx) error
-	Register(ctx *fiber.Ctx) error
+	CreateUser(ctx *fiber.Ctx) error
 	UpdateUserById(ctx *fiber.Ctx) error
 	Login(ctx *fiber.Ctx) error
 	GetAccessTokenByRefreshToken(ctx *fiber.Ctx) error
 }
 
 type handler struct {
-	userService Service
-	validate    *validator.Validate
+	userService    Service
+	userRepository Repository
+	validate       *validator.Validate
 }
 
 func (h *handler) RegisterRoutes(app *fiber.App) {
-	app.Post("/user", h.Register)
-	app.Patch("/user", h.AuthenticationMiddleware, h.UpdateUserById)
-	app.Get("/user/email/:email/password/:password", h.Login)
+	app.Post("/user", h.CreateUser)
+	app.Post("/login", h.Login)
+	app.Get("/user/:userId", h.GetUserById)
+	app.Patch("/user/:userId", h.UpdateUserById)
 	app.Get("/user/:userId/refreshToken/:refreshToken", h.GetAccessTokenByRefreshToken)
 }
 
-func NewHandler(userService Service) Handler {
+func NewHandler(userService Service, userRepository Repository) Handler {
 	validate := validator.New()
 	return &handler{
-		userService: userService,
-		validate:    validate,
+		userService:    userService,
+		userRepository: userRepository,
+		validate:       validate,
 	}
 }
 
-func (h *handler) AuthenticationMiddleware(ctx *fiber.Ctx) error {
-	var err error
-
-	log := logger.FromContext(ctx.Context()).
-		With(zap.String("eventName", "authenticationMiddleware"))
-	logger.InjectContext(ctx.Context(), log)
-
-	requestHeaders := ctx.GetReqHeaders()
-	authorizationHeader := requestHeaders[fiber.HeaderAuthorization]
-	authorizationHeaderLength := len([]rune(authorizationHeader))
-	if authorizationHeaderLength == 0 {
-		return &cerror.CustomError{
-			HttpStatusCode: http.StatusUnauthorized,
-			LogMessage:     "access token not found in authorization header",
-			LogSeverity:    zapcore.WarnLevel,
-		}
-	}
-
-	accessToken := authorizationHeader[7:authorizationHeaderLength]
-	var jwtClaims *jwt_generator.Claims
-	jwtClaims, err = h.userService.VerifyAccessToken(ctx.Context(), accessToken)
-	if err != nil {
-		return err
-	}
-
-	userId := jwtClaims.Subject
-	ctx.Locals(ContextKeyUserId, userId)
-
-	log.With(
-		zap.String("authorizationHeader", authorizationHeader),
-	).Info("authenticated")
-	return ctx.Next()
-}
-
-func (h *handler) Register(ctx *fiber.Ctx) error {
+func (h *handler) CreateUser(ctx *fiber.Ctx) error {
 	var err error
 
 	log := logger.FromContext(ctx.Context()).
@@ -117,11 +83,39 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 		JSON(tokens)
 }
 
+func (h *handler) GetUserById(ctx *fiber.Ctx) error {
+	var err error
+
+	userId := ctx.Params("userId")
+	log := logger.FromContext(ctx.Context()).
+		With(
+			zap.String("eventName", "getUserById"),
+			zap.String("userId", userId),
+		)
+	logger.InjectContext(ctx.Context(), log)
+
+	var user *Document
+	user, err = h.userRepository.FindUserWithId(ctx.Context(), userId)
+	if err != nil {
+		return err
+	}
+
+	log.Info(logger.EventFinishedSuccessfully)
+	return ctx.
+		Status(fiber.StatusOK).
+		JSON(user)
+}
+
 func (h *handler) UpdateUserById(ctx *fiber.Ctx) error {
 	var err error
 
+	userId := ctx.Params("userId")
+
 	log := logger.FromContext(ctx.Context()).
-		With(zap.String("eventName", "updateUserById"))
+		With(
+			zap.String("eventName", "updateUserById"),
+			zap.String("userId", userId),
+		)
 	logger.InjectContext(ctx.Context(), log)
 
 	var user *UpdateUserPayload
@@ -144,14 +138,6 @@ func (h *handler) UpdateUserById(ctx *fiber.Ctx) error {
 		return cerr
 	}
 
-	userId := ctx.Locals(ContextKeyUserId).(string)
-	if userId == "" {
-		return &cerror.CustomError{
-			HttpStatusCode: http.StatusBadRequest,
-			LogMessage:     "UserId context is empty",
-		}
-	}
-
 	var tokens *jwt_generator.Tokens
 	tokens, err = h.userService.UpdateUserById(ctx.Context(), userId, user)
 	if err != nil {
@@ -171,9 +157,15 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 		With(zap.String("eventName", "login"))
 	logger.InjectContext(ctx.Context(), log)
 
-	user := &LoginPayload{
-		Email:    ctx.Params("email"),
-		Password: ctx.Params("password"),
+	var user *LoginPayload
+	err = ctx.BodyParser(&user)
+	if err != nil {
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zapcore.Field{
+			zap.Any("body", ctx.Body()),
+		}
+
+		return cerr
 	}
 
 	err = h.validate.Struct(user)
@@ -194,7 +186,7 @@ func (h *handler) Login(ctx *fiber.Ctx) error {
 
 	log.Info(logger.EventFinishedSuccessfully)
 	return ctx.
-		Status(http.StatusOK).
+		Status(fiber.StatusOK).
 		JSON(tokens)
 }
 

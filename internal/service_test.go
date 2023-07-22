@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -20,6 +19,14 @@ import (
 	"user-api/pkg/cerror"
 	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
+)
+
+const (
+	TestUserId                        = "abcd-abcd-abcd-abcd-abcd"
+	TestCryptPassword                 = "$2a$07$21Py6b8E1XWLlpSS1ASxK.RhNpvm1n3q34G9uqysCwx/ciP0vSaEm\n"
+	TestRefreshTokenHistoryDocumentId = "abcd-abcd-abcd-abcd"
+	TestRefreshToken                  = "abcd.abcd.abcd"
+	TestAccessToken                   = "abcd.abcd.abcd"
 )
 
 var (
@@ -34,27 +41,19 @@ wtoFwCBLAORaw/fHr0X8MHUEstfqh3cTTg==
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHCnaSv1W3JI8jd+CkIZN1AUxldYW
 EYx9LACT245DA8dJJMx5TXP1wtoFwCBLAORaw/fHr0X8MHUEstfqh3cTTg==
 -----END PUBLIC KEY-----`)
-)
 
-var TestJwtClaims = &jwt_generator.Claims{
-	Name:  TestUserName,
-	Email: TestEmail,
-	Role:  RoleUser,
-	RegisteredClaims: jwt.RegisteredClaims{
-		ID:        uuid.New().String(),
-		Issuer:    jwt_generator.IssuerDefault,
-		Subject:   TestUserId,
-		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(5 * time.Minute)),
-		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-	},
-}
-
-const (
-	TestUserId                        = "abcd-abcd-abcd-abcd-abcd"
-	TestCryptPassword                 = "$2a$07$21Py6b8E1XWLlpSS1ASxK.RhNpvm1n3q34G9uqysCwx/ciP0vSaEm\n"
-	TestRefreshTokenHistoryDocumentId = "abcd-abcd-abcd-abcd"
-	TestRefreshToken                  = "abcd.abcd.abcd"
-	TestAccessToken                   = "abcd.abcd.abcd"
+	TestJwtClaims = &jwt_generator.Claims{
+		Name:  TestUserName,
+		Email: TestEmail,
+		Role:  RoleUser,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.New().String(),
+			Issuer:    jwt_generator.IssuerDefault,
+			Subject:   TestUserId,
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(5 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		},
+	}
 )
 
 func TestNewService(t *testing.T) {
@@ -742,179 +741,5 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Empty(t, accessToken)
-	})
-}
-
-func TestService_VerifyAccessToken(t *testing.T) {
-	mockController := gomock.NewController(t)
-	defer mockController.Finish()
-
-	t.Run("happy path", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		accessTokenExpireAt := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpireAt, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
-		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
-		mockJwtGenerator.
-			EXPECT().
-			VerifyAccessToken(accessToken).
-			Return(TestJwtClaims, nil)
-
-		mockUserRepository := NewMockRepository(mockController)
-		mockUserRepository.
-			EXPECT().
-			FindUserWithId(gomock.Any(), TestUserId).
-			Return(&Document{
-				Id:        TestUserId,
-				Name:      TestUserName,
-				Email:     TestEmail,
-				Password:  TestPassword,
-				Role:      RoleUser,
-				CreatedAt: time.Now().UTC(),
-			}, nil)
-
-		ctx := context.Background()
-		service := NewService(mockUserRepository, mockJwtGenerator)
-
-		var jwtClaims *jwt_generator.Claims
-		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
-
-		assert.NoError(t, err)
-		assert.Equal(t, TestJwtClaims, jwtClaims)
-	})
-
-	t.Run("when jwt is not valid should return error", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		accessTokenExpiresAt := time.Now().UTC().Add(10 * -time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
-		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
-		mockJwtGenerator.
-			EXPECT().
-			VerifyAccessToken(accessToken).
-			Return(nil,
-				&cerror.CustomError{
-					HttpStatusCode: fiber.StatusUnauthorized,
-					LogMessage:     "expired jwt token",
-					LogSeverity:    zapcore.WarnLevel,
-				})
-
-		ctx := context.Background()
-		service := NewService(nil, mockJwtGenerator)
-
-		var jwtClaims *jwt_generator.Claims
-		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
-
-		assert.Error(t, err)
-		assert.Empty(t, jwtClaims)
-	})
-
-	t.Run("when user can't find by user id should return error", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		accessTokenExpireAt := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpireAt, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
-		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
-		mockJwtGenerator.
-			EXPECT().
-			VerifyAccessToken(accessToken).
-			Return(&jwt_generator.Claims{
-				Name:  TestUserName,
-				Email: TestEmail,
-				Role:  RoleUser,
-				RegisteredClaims: jwt.RegisteredClaims{
-					ID:        uuid.New().String(),
-					Issuer:    jwt_generator.IssuerDefault,
-					Subject:   TestUserId,
-					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(10 * time.Minute)),
-					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-				},
-			}, nil)
-
-		mockUserRepository := NewMockRepository(mockController)
-		mockUserRepository.
-			EXPECT().
-			FindUserWithId(gomock.Any(), TestUserId).
-			Return(
-				nil,
-				cerror.ErrorNotFound,
-			)
-
-		ctx := context.Background()
-		service := NewService(mockUserRepository, mockJwtGenerator)
-
-		var jwtClaims *jwt_generator.Claims
-		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
-
-		assert.Error(t, err)
-		assert.Empty(t, jwtClaims)
-	})
-
-	t.Run("when error occurred find user by user id should return error", func(t *testing.T) {
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		accessTokenExpireAt := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpireAt, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
-		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
-		mockJwtGenerator.
-			EXPECT().
-			VerifyAccessToken(accessToken).
-			Return(&jwt_generator.Claims{
-				Name:  TestUserName,
-				Email: TestEmail,
-				Role:  RoleUser,
-				RegisteredClaims: jwt.RegisteredClaims{
-					ID:        uuid.New().String(),
-					Issuer:    jwt_generator.IssuerDefault,
-					Subject:   TestUserId,
-					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(10 * time.Minute)),
-					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-				},
-			}, nil)
-
-		mockUserRepository := NewMockRepository(mockController)
-		mockUserRepository.
-			EXPECT().
-			FindUserWithId(gomock.Any(), TestUserId).
-			Return(
-				nil,
-				&cerror.CustomError{
-					HttpStatusCode: fiber.StatusInternalServerError,
-					LogMessage:     "error",
-					LogSeverity:    zapcore.ErrorLevel,
-				})
-
-		ctx := context.Background()
-		service := NewService(mockUserRepository, mockJwtGenerator)
-
-		var jwtClaims *jwt_generator.Claims
-		jwtClaims, err = service.VerifyAccessToken(ctx, accessToken)
-
-		assert.Error(t, err)
-		assert.Empty(t, jwtClaims)
 	})
 }

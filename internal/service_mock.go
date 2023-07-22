@@ -94,18 +94,3 @@ func (mr *MockServiceMockRecorder) UpdateUserById(ctx, userId, user interface{})
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserById", reflect.TypeOf((*MockService)(nil).UpdateUserById), ctx, userId, user)
 }
-
-// VerifyAccessToken mocks base method.
-func (m *MockService) VerifyAccessToken(ctx context.Context, accessToken string) (*jwt_generator.Claims, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyAccessToken", ctx, accessToken)
-	ret0, _ := ret[0].(*jwt_generator.Claims)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// VerifyAccessToken indicates an expected call of VerifyAccessToken.
-func (mr *MockServiceMockRecorder) VerifyAccessToken(ctx, accessToken interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyAccessToken", reflect.TypeOf((*MockService)(nil).VerifyAccessToken), ctx, accessToken)
-}

@@ -68,7 +68,7 @@ func ReadMongoDbConfig() (*MongodbConfig, error) {
 	}
 
 	mongoDbRefreshTokenHistoryCollection := os.Getenv(MongoDbRefreshTokenHistoryCollection)
-	if mongodbUserCollection == "" {
+	if mongoDbRefreshTokenHistoryCollection == "" {
 		return nil, fmt.Errorf(EnvironmentVariableNotDefined, MongoDbRefreshTokenHistoryCollection)
 	}
 

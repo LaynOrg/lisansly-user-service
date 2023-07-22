@@ -2,10 +2,6 @@ package main
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"runtime"
-
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -13,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
+	"os"
 
 	user "user-api/internal"
 	"user-api/pkg/config"
@@ -33,10 +30,7 @@ func main() {
 
 	isAtRemote := os.Getenv(config.IsAtRemote)
 	if isAtRemote == "" {
-		_, currentFile, _, _ := runtime.Caller(0)
-		rootDirectory := filepath.Join(filepath.Dir(currentFile), "../..")
-		dotenvPath := filepath.Join(rootDirectory, ".env")
-		err := godotenv.Load(dotenvPath)
+		err := godotenv.Load()
 		if err != nil {
 			log.Fatalw(
 				"failed to load .env file",
@@ -81,7 +75,7 @@ func main() {
 
 	userRepository := user.NewRepository(mongoDbClient, cfg.Mongodb)
 	userService := user.NewService(userRepository, jwtGenerator)
-	userHandler := user.NewHandler(userService)
+	userHandler := user.NewHandler(userService, nil)
 
 	var handlers []server.Handler
 	handlers = append(handlers, userHandler)

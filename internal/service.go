@@ -19,7 +19,6 @@ type Service interface {
 	Login(ctx context.Context, user *LoginPayload) (*jwt_generator.Tokens, error)
 	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) (*jwt_generator.Tokens, error)
 	GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (string, error)
-	VerifyAccessToken(ctx context.Context, accessToken string) (*jwt_generator.Claims, error)
 }
 
 type service struct {
@@ -317,35 +316,4 @@ func (s *service) GetAccessTokenByRefreshToken(ctx context.Context, userId, refr
 	}
 
 	return accessToken, nil
-}
-
-func (s *service) VerifyAccessToken(ctx context.Context, accessToken string) (*jwt_generator.Claims, error) {
-	var err error
-
-	var jwtClaims *jwt_generator.Claims
-	jwtClaims, err = s.jwtGenerator.VerifyAccessToken(accessToken)
-	if err != nil {
-		return nil, &cerror.CustomError{
-			HttpStatusCode: fiber.StatusUnauthorized,
-			LogMessage:     err.(*cerror.CustomError).LogMessage,
-			LogSeverity:    zapcore.WarnLevel,
-		}
-	}
-
-	userId := jwtClaims.Subject
-	_, err = s.userRepository.FindUserWithId(ctx, userId)
-	if err != nil {
-		statusCode := err.(*cerror.CustomError).HttpStatusCode
-		if statusCode == fiber.StatusNotFound {
-			return nil, &cerror.CustomError{
-				HttpStatusCode: fiber.StatusUnauthorized,
-				LogMessage:     "user not found email in jwt claims",
-				LogSeverity:    zapcore.WarnLevel,
-			}
-		}
-
-		return nil, err
-	}
-
-	return jwtClaims, nil
 }

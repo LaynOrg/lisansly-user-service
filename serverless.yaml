@@ -26,12 +26,16 @@ functions:
           path: /user
           cors: true
       - http:
-          method: PATCH
-          path: /user
+          method: POST
+          path: /login
           cors: true
       - http:
           method: GET
-          path: /user/email/{userEmail}/password/{userPassword}
+          path: /user/{userId}
+          cors: true
+      - http:
+          method: PATCH
+          path: /user/{userId}
           cors: true
       - http:
           method: GET

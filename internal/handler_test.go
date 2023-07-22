@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -14,15 +13,12 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	"user-api/pkg/cerror"
-	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
 )
 
@@ -36,104 +32,12 @@ const (
 )
 
 func TestNewHandler(t *testing.T) {
-	userHandler := NewHandler(nil)
+	userHandler := NewHandler(nil, nil)
 
 	assert.Implements(t, (*Handler)(nil), userHandler)
 }
 
-func TestHandler_AuthenticationMiddleware(t *testing.T) {
-	mockController := gomock.NewController(t)
-	defer mockController.Finish()
-
-	t.Run("happy path", func(t *testing.T) {
-		app := fiber.New()
-
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		accessTokenExpireTime := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
-		mockUserService := NewMockService(mockController)
-		mockUserService.
-			EXPECT().
-			VerifyAccessToken(gomock.Any(), accessToken).
-			Return(TestJwtClaims, nil)
-
-		handler := NewHandler(mockUserService)
-		app.Get("/test", handler.AuthenticationMiddleware, func(ctx *fiber.Ctx) error {
-			return ctx.SendStatus(http.StatusOK)
-		})
-
-		req := httptest.NewRequest(fiber.MethodGet, "/test", nil)
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-		resp, _ := app.Test(req)
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-	})
-
-	t.Run("when Authorization header is empty should return error", func(t *testing.T) {
-		app := fiber.New(fiber.Config{
-			ErrorHandler: cerror.Middleware,
-		})
-
-		handler := NewHandler(nil)
-		app.Get("/test", handler.AuthenticationMiddleware, func(ctx *fiber.Ctx) error {
-			return ctx.SendStatus(http.StatusOK)
-		})
-
-		req := httptest.NewRequest(fiber.MethodGet, "/test", nil)
-		resp, _ := app.Test(req)
-
-		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-	})
-
-	t.Run("when user service can't validate access token should return error ", func(t *testing.T) {
-		app := fiber.New(fiber.Config{
-			ErrorHandler: cerror.Middleware,
-		})
-
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		accessTokenExpireTime := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(accessTokenExpireTime, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
-		mockUserService := NewMockService(mockController)
-		mockUserService.
-			EXPECT().
-			VerifyAccessToken(gomock.Any(), accessToken).
-			Return(
-				nil,
-				&cerror.CustomError{
-					HttpStatusCode: http.StatusUnauthorized,
-					LogMessage:     "access token is not valid",
-					LogSeverity:    zapcore.ErrorLevel,
-				},
-			)
-
-		handler := NewHandler(mockUserService)
-		app.Get("/test", handler.AuthenticationMiddleware, func(ctx *fiber.Ctx) error {
-			return ctx.SendStatus(http.StatusOK)
-		})
-
-		req := httptest.NewRequest(fiber.MethodGet, "/test", nil)
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-		resp, _ := app.Test(req)
-
-		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-	})
-}
-
-func TestHandler_Register(t *testing.T) {
+func TestHandler_CreateUser(t *testing.T) {
 	TestUserModel := RegisterPayload{
 		Name:     TestUserName,
 		Email:    TestEmail,
@@ -152,7 +56,7 @@ func TestHandler_Register(t *testing.T) {
 			RefreshToken: TestRefreshToken,
 		}, nil)
 
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(mockUserService, nil)
 		userHandler.RegisterRoutes(app)
 
 		reqBody, err := json.Marshal(&TestUserModel)
@@ -170,7 +74,7 @@ func TestHandler_Register(t *testing.T) {
 			ErrorHandler: cerror.Middleware,
 		})
 
-		userHandler := NewHandler(nil)
+		userHandler := NewHandler(nil, nil)
 		userHandler.RegisterRoutes(app)
 
 		req := httptest.NewRequest(fiber.MethodPost, "/user", strings.NewReader(`"invalid":"body"`))
@@ -192,7 +96,7 @@ func TestHandler_Register(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			userHandler := NewHandler(nil)
+			userHandler := NewHandler(nil, nil)
 			userHandler.RegisterRoutes(app)
 
 			reqBody, err := json.Marshal(&TestUserModel)
@@ -216,7 +120,7 @@ func TestHandler_Register(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			userHandler := NewHandler(nil)
+			userHandler := NewHandler(nil, nil)
 			userHandler.RegisterRoutes(app)
 
 			reqBody, err := json.Marshal(&TestUserModel)
@@ -245,7 +149,7 @@ func TestHandler_Register(t *testing.T) {
 			},
 		)
 
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(mockUserService, nil)
 		userHandler.RegisterRoutes(app)
 
 		reqBody, err := json.Marshal(&TestUserModel)
@@ -259,9 +163,41 @@ func TestHandler_Register(t *testing.T) {
 	})
 }
 
+func TestHandler_GetUserById(t *testing.T) {
+	mockController := gomock.NewController(t)
+	defer mockController.Finish()
+
+	t.Run("happy path", func(t *testing.T) {
+		app := fiber.New()
+
+		mockUserRepository := NewMockRepository(mockController)
+		mockUserRepository.
+			EXPECT().
+			FindUserWithId(gomock.Any(), TestUserId).
+			Return(&Document{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC(),
+			}, nil)
+
+		userHandler := NewHandler(nil, mockUserRepository)
+		userHandler.RegisterRoutes(app)
+
+		req := httptest.NewRequest(fiber.MethodGet, fmt.Sprintf("/user/%s", TestUserId), nil)
+		resp, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	})
+}
+
 func TestHandler_UpdateUserById(t *testing.T) {
 	mockController := gomock.NewController(t)
 	defer mockController.Finish()
+
+	requestUrl := fmt.Sprintf("/user/%s", TestUserId)
 
 	t.Run("happy path", func(t *testing.T) {
 		TestUpdateUserPayload := &UpdateUserPayload{
@@ -272,32 +208,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 		app := fiber.New()
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		expirationTime := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
 		mockUserService := NewMockService(mockController)
-		mockUserService.
-			EXPECT().
-			VerifyAccessToken(gomock.Any(), accessToken).
-			Return(&jwt_generator.Claims{
-				Name:  TestUserName,
-				Email: TestEmail,
-				Role:  RoleUser,
-				RegisteredClaims: jwt.RegisteredClaims{
-					ID:        uuid.New().String(),
-					Issuer:    jwt_generator.IssuerDefault,
-					Subject:   TestUserId,
-					ExpiresAt: jwt.NewNumericDate(expirationTime),
-					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-				},
-			}, nil)
 		mockUserService.
 			EXPECT().
 			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
@@ -306,17 +217,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				RefreshToken: TestRefreshToken,
 			}, nil)
 
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(mockUserService, nil)
 		userHandler.RegisterRoutes(app)
 
 		payload, err := json.Marshal(TestUpdateUserPayload)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+		req := httptest.NewRequest(fiber.MethodPatch, requestUrl, bytes.NewReader(payload))
 		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-
-		bearerToken := fmt.Sprintf("Bearer %s", accessToken)
-		req.Header.Set(fiber.HeaderAuthorization, bearerToken)
 
 		resp, err := app.Test(req)
 		require.NoError(t, err)
@@ -329,41 +237,11 @@ func TestHandler_UpdateUserById(t *testing.T) {
 			ErrorHandler: cerror.Middleware,
 		})
 
-		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-			PrivateKey: TestPrivateKey,
-			PublicKey:  TestPublicKey,
-		})
-		require.NoError(t, err)
-
-		expirationTime := time.Now().UTC().Add(10 * time.Minute)
-		accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
-		require.NoError(t, err)
-
-		mockUserService := NewMockService(mockController)
-		mockUserService.
-			EXPECT().
-			VerifyAccessToken(gomock.Any(), accessToken).
-			Return(&jwt_generator.Claims{
-				Name:  TestUserName,
-				Email: TestEmail,
-				Role:  RoleUser,
-				RegisteredClaims: jwt.RegisteredClaims{
-					ID:        uuid.New().String(),
-					Issuer:    jwt_generator.IssuerDefault,
-					Subject:   TestUserId,
-					ExpiresAt: jwt.NewNumericDate(expirationTime),
-					IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-				},
-			}, nil)
-
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(nil, nil)
 		userHandler.RegisterRoutes(app)
 
-		req := httptest.NewRequest(fiber.MethodPatch, "/user", strings.NewReader("invalid-json"))
+		req := httptest.NewRequest(fiber.MethodPatch, requestUrl, strings.NewReader("invalid-json"))
 		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-
-		bearerToken := fmt.Sprintf("Bearer %s", accessToken)
-		req.Header.Set(fiber.HeaderAuthorization, bearerToken)
 
 		resp, err := app.Test(req)
 		require.NoError(t, err)
@@ -381,44 +259,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-				PrivateKey: TestPrivateKey,
-				PublicKey:  TestPublicKey,
-			})
-			require.NoError(t, err)
-
-			expirationTime := time.Now().UTC().Add(10 * time.Minute)
-			accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
-			require.NoError(t, err)
-
-			mockUserService := NewMockService(mockController)
-			mockUserService.
-				EXPECT().
-				VerifyAccessToken(gomock.Any(), accessToken).
-				Return(&jwt_generator.Claims{
-					Name:  TestUserName,
-					Email: TestEmail,
-					Role:  RoleUser,
-					RegisteredClaims: jwt.RegisteredClaims{
-						ID:        uuid.New().String(),
-						Issuer:    jwt_generator.IssuerDefault,
-						Subject:   TestUserId,
-						ExpiresAt: jwt.NewNumericDate(expirationTime),
-						IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-					},
-				}, nil)
-
-			userHandler := NewHandler(mockUserService)
+			userHandler := NewHandler(nil, nil)
 			userHandler.RegisterRoutes(app)
 
 			payload, err := json.Marshal(TestUpdateUserPayload)
 			require.NoError(t, err)
 
-			req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+			req := httptest.NewRequest(fiber.MethodPatch, requestUrl, bytes.NewReader(payload))
 			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-
-			bearerToken := fmt.Sprintf("Bearer %s", accessToken)
-			req.Header.Set(fiber.HeaderAuthorization, bearerToken)
 
 			resp, err := app.Test(req)
 			require.NoError(t, err)
@@ -435,44 +283,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-				PrivateKey: TestPrivateKey,
-				PublicKey:  TestPublicKey,
-			})
-			require.NoError(t, err)
-
-			expirationTime := time.Now().UTC().Add(10 * time.Minute)
-			accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
-			require.NoError(t, err)
-
-			mockUserService := NewMockService(mockController)
-			mockUserService.
-				EXPECT().
-				VerifyAccessToken(gomock.Any(), accessToken).
-				Return(&jwt_generator.Claims{
-					Name:  TestUserName,
-					Email: TestEmail,
-					Role:  RoleUser,
-					RegisteredClaims: jwt.RegisteredClaims{
-						ID:        uuid.New().String(),
-						Issuer:    jwt_generator.IssuerDefault,
-						Subject:   TestUserId,
-						ExpiresAt: jwt.NewNumericDate(expirationTime),
-						IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-					},
-				}, nil)
-
-			userHandler := NewHandler(mockUserService)
+			userHandler := NewHandler(nil, nil)
 			userHandler.RegisterRoutes(app)
 
 			payload, err := json.Marshal(TestUpdateUserPayload)
 			require.NoError(t, err)
 
-			req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+			req := httptest.NewRequest(fiber.MethodPatch, requestUrl, bytes.NewReader(payload))
 			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-
-			bearerToken := fmt.Sprintf("Bearer %s", accessToken)
-			req.Header.Set(fiber.HeaderAuthorization, bearerToken)
 
 			resp, err := app.Test(req)
 			require.NoError(t, err)
@@ -491,44 +309,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
-				PrivateKey: TestPrivateKey,
-				PublicKey:  TestPublicKey,
-			})
-			require.NoError(t, err)
-
-			expirationTime := time.Now().UTC().Add(10 * time.Minute)
-			accessToken, err := jwtGenerator.GenerateAccessToken(expirationTime, TestUserName, TestEmail, TestUserId)
-			require.NoError(t, err)
-
-			mockUserService := NewMockService(mockController)
-			mockUserService.
-				EXPECT().
-				VerifyAccessToken(gomock.Any(), accessToken).
-				Return(&jwt_generator.Claims{
-					Name:  TestUserName,
-					Email: TestEmail,
-					Role:  RoleUser,
-					RegisteredClaims: jwt.RegisteredClaims{
-						ID:        uuid.New().String(),
-						Issuer:    jwt_generator.IssuerDefault,
-						Subject:   TestUserId,
-						ExpiresAt: jwt.NewNumericDate(expirationTime),
-						IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-					},
-				}, nil)
-
-			userHandler := NewHandler(mockUserService)
+			userHandler := NewHandler(nil, nil)
 			userHandler.RegisterRoutes(app)
 
 			payload, err := json.Marshal(TestUpdateUserPayload)
 			require.NoError(t, err)
 
-			req := httptest.NewRequest(fiber.MethodPatch, "/user", bytes.NewReader(payload))
+			req := httptest.NewRequest(fiber.MethodPatch, requestUrl, bytes.NewReader(payload))
 			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-
-			bearerToken := fmt.Sprintf("Bearer %s", accessToken)
-			req.Header.Set(fiber.HeaderAuthorization, bearerToken)
 
 			resp, err := app.Test(req)
 			require.NoError(t, err)
@@ -555,26 +343,34 @@ func TestHandler_Login(t *testing.T) {
 			RefreshToken: TestRefreshToken,
 		}, nil)
 
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(mockUserService, nil)
 		userHandler.RegisterRoutes(app)
 
+		reqBody, err := json.Marshal(&TestUserModel)
+		require.NoError(t, err)
+
 		req := httptest.NewRequest(
-			fiber.MethodGet,
-			fmt.Sprintf("/user/email/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
-			nil,
+			fiber.MethodPost,
+			"/login",
+			bytes.NewReader(reqBody),
 		)
-		resp, _ := app.Test(req)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		req.Header.Set(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
 
 		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("validation", func(t *testing.T) {
-		t.Run("email", func(t *testing.T) {
+		t.Run("invalid email", func(t *testing.T) {
 			TestUserModel := LoginPayload{
-				Email:    TestEmail,
+				Email:    "invalid-email",
 				Password: TestPassword,
 			}
-			app := fiber.New()
+			app := fiber.New(fiber.Config{
+				ErrorHandler: cerror.Middleware,
+			})
 
 			mockUserService := NewMockService(mockController)
 			mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(&jwt_generator.Tokens{
@@ -582,25 +378,33 @@ func TestHandler_Login(t *testing.T) {
 				RefreshToken: TestRefreshToken,
 			}, nil)
 
-			userHandler := NewHandler(mockUserService)
+			reqBody, err := json.Marshal(TestUserModel)
+			require.NoError(t, err)
+
+			userHandler := NewHandler(mockUserService, nil)
 			userHandler.RegisterRoutes(app)
 
 			req := httptest.NewRequest(
-				fiber.MethodGet,
-				fmt.Sprintf("/user/email/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
-				nil,
+				fiber.MethodPost,
+				"/login",
+				bytes.NewReader(reqBody),
 			)
-			resp, _ := app.Test(req)
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+			req.Header.Set(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
 
-			assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 		})
 
-		t.Run("happy path", func(t *testing.T) {
+		t.Run("invalid password", func(t *testing.T) {
 			TestUserModel := LoginPayload{
 				Email:    TestEmail,
-				Password: TestPassword,
+				Password: "123",
 			}
-			app := fiber.New()
+			app := fiber.New(fiber.Config{
+				ErrorHandler: cerror.Middleware,
+			})
 
 			mockUserService := NewMockService(mockController)
 			mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(&jwt_generator.Tokens{
@@ -608,17 +412,23 @@ func TestHandler_Login(t *testing.T) {
 				RefreshToken: TestRefreshToken,
 			}, nil)
 
-			userHandler := NewHandler(mockUserService)
+			userHandler := NewHandler(mockUserService, nil)
 			userHandler.RegisterRoutes(app)
 
-			req := httptest.NewRequest(
-				fiber.MethodGet,
-				fmt.Sprintf("/user/email/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
-				nil,
-			)
-			resp, _ := app.Test(req)
+			reqBody, err := json.Marshal(&TestUserModel)
+			require.NoError(t, err)
 
-			assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+			req := httptest.NewRequest(
+				fiber.MethodPost,
+				"/login",
+				bytes.NewReader(reqBody),
+			)
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+			req.Header.Set(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 		})
 	})
 
@@ -641,15 +451,21 @@ func TestHandler_Login(t *testing.T) {
 			},
 		)
 
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(mockUserService, nil)
 		userHandler.RegisterRoutes(app)
 
+		reqBody, err := json.Marshal(TestUserModel)
+		require.NoError(t, err)
+
 		req := httptest.NewRequest(
-			fiber.MethodGet,
-			fmt.Sprintf("/user/email/%s/password/%s", TestUserModel.Email, TestUserModel.Password),
-			nil,
+			fiber.MethodPost,
+			"/login",
+			bytes.NewReader(reqBody),
 		)
-		resp, _ := app.Test(req)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		req.Header.Set(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
 
 		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
 	})
@@ -668,7 +484,7 @@ func TestHandler_GetAccessTokenByRefreshToken(t *testing.T) {
 			GetAccessTokenByRefreshToken(gomock.Any(), TestUserId, TestRefreshToken).
 			Return(TestAccessToken, nil)
 
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(mockUserService, nil)
 		userHandler.RegisterRoutes(app)
 
 		request := httptest.NewRequest(
@@ -704,7 +520,7 @@ func TestHandler_GetAccessTokenByRefreshToken(t *testing.T) {
 				},
 			)
 
-		userHandler := NewHandler(mockUserService)
+		userHandler := NewHandler(mockUserService, nil)
 		userHandler.RegisterRoutes(app)
 
 		request := httptest.NewRequest(
