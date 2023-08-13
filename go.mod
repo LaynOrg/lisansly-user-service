@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/aws/aws-lambda-go v1.41.0
 	github.com/awslabs/aws-lambda-go-api-proxy v0.14.0
-	github.com/go-playground/validator/v10 v10.14.1
+	github.com/go-playground/validator/v10 v10.15.0
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.48.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
@@ -16,9 +16,9 @@ require (
 	github.com/pact-foundation/pact-go/v2 v2.0.1
 	github.com/stretchr/testify v1.8.3
 	github.com/testcontainers/testcontainers-go v0.18.0
-	go.mongodb.org/mongo-driver v1.12.0
-	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.11.0
+	go.mongodb.org/mongo-driver v1.12.1
+	go.uber.org/zap v1.25.0
+	golang.org/x/crypto v0.12.0
 )
 
 require (
@@ -63,7 +63,7 @@ require (
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/moby/patternmatcher v0.5.0 // indirect
@@ -93,11 +93,11 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.12.0 // indirect
+	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/text v0.11.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.130.0 // indirect
