@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -9,7 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
-	"os"
 
 	user "user-api/internal"
 	"user-api/pkg/config"
