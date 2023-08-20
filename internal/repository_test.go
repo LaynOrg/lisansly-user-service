@@ -1054,22 +1054,17 @@ func TestRepository_UpdateUserById(t *testing.T) {
 }
 
 func setupMongoDbContainer(t *testing.T, ctx context.Context) testcontainers.Container {
-	req := testcontainers.ContainerRequest{
-		Image: "mongo",
-		Env: map[string]string{
-			"MONGO_INITDB_ROOT_USERNAME": TestMongoDbUserName,
-			"MONGO_INITDB_ROOT_PASSWORD": TestMongoDbPassword,
-		},
-		ExposedPorts: []string{"27017/tcp"},
-		WaitingFor: wait.ForAll(
-			wait.ForLog("Waiting for connections"),
-			wait.ForListeningPort("27017/tcp"),
-		),
-	}
-
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:        "mongo",
+			ExposedPorts: []string{"27017/tcp"},
+			Env: map[string]string{
+				"MONGO_INITDB_ROOT_USERNAME": TestMongoDbUserName,
+				"MONGO_INITDB_ROOT_PASSWORD": TestMongoDbPassword,
+			},
+			WaitingFor: wait.ForExposedPort(),
+		},
+		Started: true,
 	})
 	if err != nil {
 		t.Fatal(err)

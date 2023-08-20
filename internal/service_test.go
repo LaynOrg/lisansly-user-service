@@ -9,11 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap/zapcore"
 
 	"user-api/pkg/cerror"
@@ -41,19 +39,6 @@ wtoFwCBLAORaw/fHr0X8MHUEstfqh3cTTg==
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHCnaSv1W3JI8jd+CkIZN1AUxldYW
 EYx9LACT245DA8dJJMx5TXP1wtoFwCBLAORaw/fHr0X8MHUEstfqh3cTTg==
 -----END PUBLIC KEY-----`)
-
-	TestJwtClaims = &jwt_generator.Claims{
-		Name:  TestUserName,
-		Email: TestEmail,
-		Role:  RoleUser,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        uuid.New().String(),
-			Issuer:    jwt_generator.IssuerDefault,
-			Subject:   TestUserId,
-			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(5 * time.Minute)),
-			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-		},
-	}
 )
 
 func TestNewService(t *testing.T) {

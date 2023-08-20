@@ -13,9 +13,9 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap/zapcore"
 
 	"user-api/pkg/cerror"
@@ -372,16 +372,10 @@ func TestHandler_Login(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			mockUserService := NewMockService(mockController)
-			mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(&jwt_generator.Tokens{
-				AccessToken:  TestAccessToken,
-				RefreshToken: TestRefreshToken,
-			}, nil)
-
 			reqBody, err := json.Marshal(TestUserModel)
 			require.NoError(t, err)
 
-			userHandler := NewHandler(mockUserService, nil)
+			userHandler := NewHandler(nil, nil)
 			userHandler.RegisterRoutes(app)
 
 			req := httptest.NewRequest(
@@ -406,13 +400,7 @@ func TestHandler_Login(t *testing.T) {
 				ErrorHandler: cerror.Middleware,
 			})
 
-			mockUserService := NewMockService(mockController)
-			mockUserService.EXPECT().Login(gomock.Any(), &TestUserModel).Return(&jwt_generator.Tokens{
-				AccessToken:  TestAccessToken,
-				RefreshToken: TestRefreshToken,
-			}, nil)
-
-			userHandler := NewHandler(mockUserService, nil)
+			userHandler := NewHandler(nil, nil)
 			userHandler.RegisterRoutes(app)
 
 			reqBody, err := json.Marshal(&TestUserModel)

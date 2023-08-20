@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 	jwt_generator "user-api/pkg/jwt_generator"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockService is a mock of Service interface.
