@@ -4,8 +4,6 @@ provider:
   name: aws
   runtime: go1.x
   region: us-west-1
-  apiGateway:
-    disableDefaultEndpoint: true
 
 package:
   patterns:
