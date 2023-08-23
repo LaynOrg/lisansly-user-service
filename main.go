@@ -44,7 +44,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	cfg.Print()
 
 	var jwtGenerator jwt_generator.JwtGenerator
 	jwtGenerator, err = jwt_generator.NewJwtGenerator(cfg.Jwt)
@@ -93,6 +92,7 @@ func main() {
 	srv.RegisterRoutes()
 
 	if isAtRemote == "" {
+		cfg.Print()
 		err = srv.Start()
 		if err != nil {
 			panic(err)
