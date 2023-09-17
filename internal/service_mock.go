@@ -36,10 +36,10 @@ func (m *MockService) EXPECT() *MockServiceMockRecorder {
 }
 
 // GetAccessTokenByRefreshToken mocks base method.
-func (m *MockService) GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (string, error) {
+func (m *MockService) GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (*AccessTokenPayload, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAccessTokenByRefreshToken", ctx, userId, refreshToken)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(*AccessTokenPayload)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -2,12 +2,14 @@ package user
 
 import (
 	"context"
-	"time"
+	"errors"
+	"net/http"
 
-	"github.com/gofiber/fiber/v2"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -16,95 +18,134 @@ import (
 )
 
 type Repository interface {
-	InsertUser(ctx context.Context, user *Document) (string, error)
-	FindUserWithId(ctx context.Context, userId string) (*Document, error)
-	FindUserWithEmail(ctx context.Context, email string) (*Document, error)
-	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryDocument) error
-	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryDocument, error)
+	InsertUser(ctx context.Context, user *Table) error
+	FindUserWithId(ctx context.Context, userId string) (*Table, error)
+	FindUserWithEmail(ctx context.Context, email string) (*Table, error)
+	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) error
+	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, error)
 	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) error
 }
 
 type repository struct {
-	mongoClient   *mongo.Client
-	mongoDbConfig *config.MongodbConfig
+	dynamodbClient *dynamodb.Client
+	dynamodbConfig *config.DynamoDbConfig
 }
 
 func NewRepository(
-	mongoClient *mongo.Client,
-	mongoDbConfig *config.MongodbConfig,
+	dynamodbClient *dynamodb.Client,
+	dynamodbConfig *config.DynamoDbConfig,
 ) Repository {
 	return &repository{
-		mongoClient:   mongoClient,
-		mongoDbConfig: mongoDbConfig,
+		dynamodbClient: dynamodbClient,
+		dynamodbConfig: dynamodbConfig,
 	}
 }
 
-func (r *repository) InsertUser(ctx context.Context, user *Document) (string, error) {
-	collection := r.mongoClient.
-		Database(r.mongoDbConfig.Database).
-		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
+func (r *repository) InsertUser(ctx context.Context, user *Table) error {
+	var err error
 
-	var foundUser *Document
-
-	filter := bson.D{{"email", user.Email}}
-	err := collection.FindOne(ctx, &filter).Decode(&foundUser)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return "", &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while user existing check",
-			LogSeverity:    zapcore.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
-		}
-	}
-
-	if foundUser != nil {
-		return "", &cerror.CustomError{
-			HttpStatusCode: fiber.StatusConflict,
-			LogMessage:     "user already exists",
-			LogSeverity:    zapcore.WarnLevel,
-		}
-	}
-
-	result, err := collection.InsertOne(ctx, user)
-	if err != nil {
-		return "", &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while insert user",
-			LogSeverity:    zapcore.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
-		}
-	}
-
-	userID, ok := result.InsertedID.(string)
-	if !ok {
-		return "", &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while type casting for user id",
-			LogSeverity:    zapcore.ErrorLevel,
-		}
-	}
-
-	return userID, nil
-}
-
-func (r *repository) InsertRefreshTokenHistory(
-	ctx context.Context,
-	refreshTokenHistory *RefreshTokenHistoryDocument,
-) error {
-	collection := r.mongoClient.
-		Database(r.mongoDbConfig.Database).
-		Collection(r.mongoDbConfig.Collections[config.MongoDbRefreshTokenHistoryCollection])
-
-	_, err := collection.InsertOne(ctx, refreshTokenHistory)
+	var userItem map[string]types.AttributeValue
+	userItem, err = attributevalue.MarshalMap(user)
 	if err != nil {
 		return &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while insert refresh token",
-			LogSeverity:    zapcore.ErrorLevel,
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshal user",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	var userUniquenessItem map[string]types.AttributeValue
+	userUniquenessItem, err = attributevalue.MarshalMap(&UniquenessTable{
+		Unique: user.Email,
+		Type:   UniquenessEmail,
+	})
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshal user's uniqueness",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	var userIdExpression expression.Expression
+	userIdExpression, err = expression.
+		NewBuilder().
+		WithCondition(
+			expression.Name("id").AttributeNotExists(),
+		).
+		Build()
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while build user id expression",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	var userEmailExpression expression.Expression
+	userEmailExpression, err = expression.
+		NewBuilder().
+		WithCondition(
+			expression.Name("unique").AttributeNotExists(),
+		).
+		Build()
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while build email expression",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	userTableName := aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable])
+	userUniquenessTableName := aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserUniquenessTable])
+	_, err = r.dynamodbClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{
+				Put: &types.Put{
+					Item:                     userItem,
+					ConditionExpression:      userIdExpression.Condition(),
+					ExpressionAttributeNames: userIdExpression.Names(),
+					TableName:                userTableName,
+				},
+			},
+			{
+				Put: &types.Put{
+					Item:                     userUniquenessItem,
+					ConditionExpression:      userEmailExpression.Condition(),
+					ExpressionAttributeNames: userEmailExpression.Names(),
+					TableName:                userUniquenessTableName,
+				},
+			},
+		},
+	})
+	if err != nil {
+		var alreadyExistError *types.TransactionCanceledException
+		ok := errors.As(err, &alreadyExistError)
+		if ok {
+			return &cerror.CustomError{
+				HttpStatusCode: http.StatusConflict,
+				LogMessage:     "user already exist",
+				LogSeverity:    zapcore.WarnLevel,
+			}
+		}
+
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while insert user",
+			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -114,24 +155,99 @@ func (r *repository) InsertRefreshTokenHistory(
 	return nil
 }
 
-func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Document, error) {
-	collection := r.mongoClient.
-		Database(r.mongoDbConfig.Database).
-		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
+func (r *repository) InsertRefreshTokenHistory(
+	ctx context.Context,
+	refreshTokenHistory *RefreshTokenHistoryTable,
+) error {
+	var err error
 
-	var user *Document
-
-	filter := bson.D{{"email", email}}
-	err := collection.FindOne(ctx, &filter).Decode(&user)
+	var refreshTokenHistoryItem map[string]types.AttributeValue
+	refreshTokenHistoryItem, err = attributevalue.MarshalMap(refreshTokenHistory)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, cerror.ErrorNotFound
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshal refresh token history",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
 		}
+	}
 
+	tableName := aws.String(r.dynamodbConfig.Tables[config.DynamoDbRefreshTokenHistoryTable])
+	_, err = r.dynamodbClient.PutItem(ctx, &dynamodb.PutItemInput{
+		Item:      refreshTokenHistoryItem,
+		TableName: tableName,
+	})
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while insert refresh token history",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	return nil
+}
+
+func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Table, error) {
+	var err error
+
+	condition := expression.Key("id").Equal(expression.Value(userId))
+
+	var expr expression.Expression
+	expr, err = expression.
+		NewBuilder().
+		WithKeyCondition(condition).
+		Build()
+	if err != nil {
 		return nil, &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while find user with email",
-			LogSeverity:    zapcore.ErrorLevel,
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while build expression",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	var result *dynamodb.QueryOutput
+	result, err = r.dynamodbClient.Query(ctx, &dynamodb.QueryInput{
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		Limit:                     aws.Int32(1),
+		TableName:                 aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable]),
+	})
+	if err != nil {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while getting user",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	if len(result.Items) == 0 {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusNotFound,
+			LogMessage:     "user not found",
+			LogSeverity:    zap.ErrorLevel,
+		}
+	}
+
+	var user *Table
+	err = attributevalue.UnmarshalMap(result.Items[0], &user)
+	if err != nil {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while unmarshalling item",
+			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -141,24 +257,61 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Docu
 	return user, nil
 }
 
-func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Document, error) {
-	collection := r.mongoClient.
-		Database(r.mongoDbConfig.Database).
-		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
+func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Table, error) {
+	var err error
 
-	var user *Document
+	condition := expression.Name("email").Equal(expression.Value(email))
 
-	filter := bson.D{{"_id", userId}}
-	err := collection.FindOne(ctx, &filter).Decode(&user)
+	var expr expression.Expression
+	expr, err = expression.
+		NewBuilder().
+		WithFilter(condition).
+		Build()
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, cerror.ErrorNotFound
-		}
-
 		return nil, &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while find user with id",
-			LogSeverity:    zapcore.ErrorLevel,
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while build expression",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	var result *dynamodb.ScanOutput
+	result, err = r.dynamodbClient.Scan(ctx, &dynamodb.ScanInput{
+		FilterExpression:          expr.Filter(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		Limit:                     aws.Int32(1),
+		TableName:                 aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable]),
+	})
+	if err != nil {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while getting user",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	if len(result.Items) == 0 {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusNotFound,
+			LogMessage:     "user not found",
+			LogSeverity:    zap.WarnLevel,
+		}
+	}
+
+	var user *Table
+	err = attributevalue.UnmarshalMap(result.Items[0], &user)
+	if err != nil {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while unmarshal user",
+			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -168,31 +321,61 @@ func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Docume
 	return user, nil
 }
 
-func (r *repository) FindRefreshTokenWithUserId(
-	ctx context.Context, userId string,
-) (*RefreshTokenHistoryDocument, error) {
-	collection := r.mongoClient.
-		Database(r.mongoDbConfig.Database).
-		Collection(r.mongoDbConfig.Collections[config.MongoDbRefreshTokenHistoryCollection])
+func (r *repository) FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, error) {
+	var err error
 
-	var refreshToken *RefreshTokenHistoryDocument
+	condition := expression.Name("userId").Equal(expression.Value(userId))
 
-	filter := bson.D{{"userId", userId}}
-	findOneOptions := options.FindOne().SetSort(bson.M{"$natural": -1})
-	err := collection.FindOne(ctx, &filter, findOneOptions).Decode(&refreshToken)
+	var expr expression.Expression
+	expr, err = expression.
+		NewBuilder().
+		WithFilter(condition).
+		Build()
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, &cerror.CustomError{
-				HttpStatusCode: fiber.StatusNotFound,
-				LogMessage:     "refresh token not found",
-				LogSeverity:    zapcore.WarnLevel,
-			}
-		}
-
 		return nil, &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while find refresh token",
-			LogSeverity:    zapcore.ErrorLevel,
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while build expression",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	var result *dynamodb.ScanOutput
+	result, err = r.dynamodbClient.Scan(ctx, &dynamodb.ScanInput{
+		FilterExpression:          expr.Filter(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		Limit:                     aws.Int32(1),
+		TableName:                 aws.String(r.dynamodbConfig.Tables[config.DynamoDbRefreshTokenHistoryTable]),
+	})
+	if err != nil {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while getting item",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	if len(result.Items) == 0 {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusNotFound,
+			LogMessage:     "refresh token not found",
+			LogSeverity:    zap.ErrorLevel,
+		}
+	}
+
+	var refreshToken *RefreshTokenHistoryTable
+	err = attributevalue.UnmarshalMap(result.Items[0], &refreshToken)
+	if err != nil {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while unmarshalling",
+			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -202,44 +385,191 @@ func (r *repository) FindRefreshTokenWithUserId(
 	return refreshToken, nil
 }
 
-func (r *repository) UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) error {
-	collection := r.mongoClient.
-		Database(r.mongoDbConfig.Database).
-		Collection(r.mongoDbConfig.Collections[config.MongodbUserCollection])
+func (r *repository) UpdateUserById(ctx context.Context, userId string, updateUserPayload *UpdateUserPayload) error {
+	var (
+		err                 error
+		userTable           = aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable])
+		userUniquenessTable = aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserUniquenessTable])
+		userIdKey           = map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{Value: userId},
+		}
+	)
 
-	userDocument := &Document{
-		Name:      user.Name,
-		Email:     user.Email,
-		Password:  user.Password,
-		Role:      RoleUser,
-		UpdatedAt: time.Now().UTC(),
+	var updateExpression expression.Expression
+	updateExpression, err = r.buildUpdateExpression(updateUserPayload)
+	if err != nil {
+		return err
 	}
 
-	update := bson.D{{"$set", userDocument}}
-	updateOptions := options.Update().SetUpsert(false)
-	result, err := collection.UpdateByID(ctx, userId, update, updateOptions)
-	if err != nil {
-		if mongo.IsDuplicateKeyError(err) {
+	if updateUserPayload.Email != "" {
+		var result *dynamodb.GetItemOutput
+		result, err = r.dynamodbClient.GetItem(ctx, &dynamodb.GetItemInput{
+			Key:       userIdKey,
+			TableName: userTable,
+		})
+		if err != nil {
 			return &cerror.CustomError{
-				HttpStatusCode: fiber.StatusConflict,
-				LogMessage:     "same email address already exist in user collection",
-				LogSeverity:    zapcore.WarnLevel,
+				HttpStatusCode: http.StatusInternalServerError,
+				LogMessage:     "error occurred while find user with key",
+				LogSeverity:    zap.ErrorLevel,
+				LogFields: []zap.Field{
+					zap.Error(err),
+				},
 			}
 		}
 
-		return &cerror.CustomError{
-			HttpStatusCode: fiber.StatusInternalServerError,
-			LogMessage:     "error occurred while update user",
-			LogSeverity:    zapcore.ErrorLevel,
+		if result.Item == nil {
+			return &cerror.CustomError{
+				HttpStatusCode: http.StatusNotFound,
+				LogMessage:     "user not found",
+				LogSeverity:    zap.ErrorLevel,
+			}
+		}
+
+		var userInDatabase *Table
+		err = attributevalue.UnmarshalMap(result.Item, &userInDatabase)
+		if err != nil {
+			return &cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+				LogMessage:     "error occurred while unmarshalling user item",
+				LogSeverity:    zap.ErrorLevel,
+				LogFields: []zap.Field{
+					zap.Error(err),
+				},
+			}
+		}
+
+		var emailUniquenessItem map[string]types.AttributeValue
+		emailUniquenessItem, err = attributevalue.MarshalMap(&UniquenessTable{
+			Unique: updateUserPayload.Email,
+			Type:   UniquenessEmail,
+		})
+		if err != nil {
+			return &cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+				LogMessage:     "error occurred while marshalling email uniqueness item",
+				LogSeverity:    zap.ErrorLevel,
+				LogFields: []zap.Field{
+					zap.Error(err),
+				},
+			}
+		}
+
+		_, err = r.dynamodbClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{
+					Update: &types.Update{
+						Key:                       userIdKey,
+						TableName:                 userTable,
+						UpdateExpression:          updateExpression.Update(),
+						ExpressionAttributeNames:  updateExpression.Names(),
+						ExpressionAttributeValues: updateExpression.Values(),
+					},
+				},
+				{
+					Delete: &types.Delete{
+						TableName: userUniquenessTable,
+						Key: map[string]types.AttributeValue{
+							"unique": &types.AttributeValueMemberS{
+								Value: userInDatabase.Email,
+							},
+						},
+					},
+				},
+				{
+					Put: &types.Put{
+						Item:      emailUniquenessItem,
+						TableName: userUniquenessTable,
+					},
+				},
+			},
+		})
+		if err != nil {
+			var emailAlreadyExist *types.ConditionalCheckFailedException
+			ok := errors.As(err, &emailAlreadyExist)
+			if ok {
+				return &cerror.CustomError{
+					HttpStatusCode: http.StatusConflict,
+					LogMessage:     "email address already exist in user table",
+					LogSeverity:    zapcore.WarnLevel,
+					LogFields: []zap.Field{
+						zap.Error(emailAlreadyExist),
+					},
+				}
+			}
+
+			return &cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+				LogMessage:     "error occurred while update user",
+				LogSeverity:    zap.ErrorLevel,
+				LogFields: []zap.Field{
+					zap.Error(err),
+				},
+			}
+		}
+	} else {
+		_, err = r.dynamodbClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			Key:                       userIdKey,
+			UpdateExpression:          updateExpression.Update(),
+			ExpressionAttributeNames:  updateExpression.Names(),
+			ExpressionAttributeValues: updateExpression.Values(),
+			ReturnValues:              types.ReturnValueNone,
+			TableName:                 userTable,
+		})
+		if err != nil {
+			return &cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+				LogMessage:     "error occurred while update user",
+				LogSeverity:    zap.ErrorLevel,
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *repository) buildUpdateExpression(updateUserPayload *UpdateUserPayload) (expression.Expression, error) {
+	var (
+		err           error
+		updateBuilder expression.UpdateBuilder
+	)
+
+	if updateUserPayload.Name != "" {
+		updateBuilder = updateBuilder.Set(
+			expression.Name("name"),
+			expression.Value(updateUserPayload.Name),
+		)
+	}
+
+	if updateUserPayload.Password != "" {
+		updateBuilder = updateBuilder.Set(
+			expression.Name("password"),
+			expression.Value(updateUserPayload.Password),
+		)
+	}
+
+	if updateUserPayload.Email != "" {
+		updateBuilder = updateBuilder.Set(
+			expression.Name("email"),
+			expression.Value(updateUserPayload.Email),
+		)
+	}
+
+	var updateExpression expression.Expression
+	updateExpression, err = expression.
+		NewBuilder().
+		WithUpdate(updateBuilder).
+		Build()
+	if err != nil {
+		return expression.Expression{}, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while build update expression",
+			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
 		}
 	}
 
-	if result.ModifiedCount == 0 {
-		return cerror.ErrorNotFound
-	}
-
-	return nil
+	return updateExpression, nil
 }

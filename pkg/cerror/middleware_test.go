@@ -1,56 +1,127 @@
-//go:build unit
-
 package cerror
 
 import (
-	"github.com/stretchr/testify/assert"
+	"context"
+	"errors"
 	"net/http"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"user-api/pkg/logger"
 )
 
-func TestMiddleware(t *testing.T) {
-	t.Run("when custom error type error pass to middleware should resolve and return it", func(t *testing.T) {
-		app := fiber.New(fiber.Config{
-			ErrorHandler: Middleware,
+var testErr error = &CustomError{
+	HttpStatusCode: http.StatusInternalServerError,
+	LogMessage:     "test error",
+	LogSeverity:    zap.ErrorLevel,
+	LogFields: []zap.Field{
+		zap.Error(errors.New("test error")),
+	},
+}
+
+func TestWithMiddleware(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		out := WithMiddleware(ErrorHandler, func(
+			ctx context.Context,
+			request events.APIGatewayProxyRequest,
+		) (events.APIGatewayProxyResponse, error) {
+			return events.APIGatewayProxyResponse{}, testErr
 		})
-		app.Get("/", func(ctx *fiber.Ctx) error {
-			return &CustomError{
-				HttpStatusCode: fiber.StatusInternalServerError,
-				LogMessage:     "something went wrong",
-				LogSeverity:    zap.ErrorLevel,
-				LogFields: []zap.Field{
-					zap.String("key", "value"),
-				},
-			}
-		})
 
-		req, err := http.NewRequest(fiber.MethodGet, "/", nil)
+		ctx := context.Background()
+		logProd, err := zap.NewProduction()
 		require.NoError(t, err)
+		log := logProd.Sugar()
+		defer log.Sync()
 
-		resp, err := app.Test(req)
-		require.NoError(t, err)
+		ctx = context.WithValue(ctx, logger.ContextLoggerValue, log)
+		response, err := out(ctx, events.APIGatewayProxyRequest{})
 
-		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+		assert.Empty(t, response)
+		assert.Equal(t, testErr, err)
 	})
 
-	t.Run("when error pass to middleware should resolve and return it", func(t *testing.T) {
-		app := fiber.New(fiber.Config{
-			ErrorHandler: Middleware,
-		})
-		app.Get("/", func(ctx *fiber.Ctx) error {
-			return fiber.NewError(fiber.StatusInternalServerError, "something went wrong")
-		})
+	t.Run("when error is nil should skip request", func(t *testing.T) {
+		out := WithMiddleware(
+			ErrorHandler,
+			func(
+				ctx context.Context,
+				request events.APIGatewayProxyRequest,
+			) (events.APIGatewayProxyResponse, error) {
+				return events.APIGatewayProxyResponse{
+					StatusCode: http.StatusOK,
+				}, nil
+			})
 
-		req, err := http.NewRequest(fiber.MethodGet, "/", nil)
+		ctx := context.Background()
+		logProd, err := zap.NewProduction()
 		require.NoError(t, err)
+		log := logProd.Sugar()
+		defer log.Sync()
 
-		resp, err := app.Test(req)
+		ctx = context.WithValue(ctx, logger.ContextLoggerValue, log)
+		response, err := out(ctx, events.APIGatewayProxyRequest{})
+
+		assert.Equal(t, http.StatusOK, response.StatusCode)
+		assert.NoError(t, err)
+	})
+}
+
+func TestErrorHandler(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		ctx := context.Background()
+
+		logProd, err := zap.NewProduction()
 		require.NoError(t, err)
+		log := logProd.Sugar()
+		defer log.Sync()
 
-		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+		ctx = context.WithValue(ctx, logger.ContextLoggerValue, log)
+		testError := &CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "test error",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(errors.New("test error")),
+			},
+		}
+		response, err := ErrorHandler(ctx, testError)
+
+		assert.Empty(t, response)
+		assert.Equal(t, testError, err.(*CustomError))
+	})
+
+	t.Run("when error is not type of cerror should return error", func(t *testing.T) {
+		ctx := context.Background()
+		logProd, err := zap.NewProduction()
+		require.NoError(t, err)
+		log := logProd.Sugar()
+		defer log.Sync()
+
+		ctx = context.WithValue(ctx, logger.ContextLoggerValue, log)
+		response, err := ErrorHandler(ctx, errors.New("test error"))
+
+		assert.Empty(t, response)
+		assert.Error(t, err)
+	})
+
+	t.Run("when logger is not in context should return default error", func(t *testing.T) {
+		ctx := context.Background()
+		testError := &CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "test error",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(errors.New("test error")),
+			},
+		}
+		response, err := ErrorHandler(ctx, testError)
+
+		assert.Empty(t, response)
+		assert.Equal(t, errors.New("InternalServerError"), err)
 	})
 }

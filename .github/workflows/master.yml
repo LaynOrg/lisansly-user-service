@@ -6,9 +6,6 @@ on:
     branches:
       - master
 
-env:
-  APP_NAME: ${{ github.event.repository.name }}
-
 jobs:
 
   lint:
@@ -40,13 +37,17 @@ jobs:
 
       - name: Build
         shell: bash
-        run: CGO_ENABLED=0 GOOS=linux go build -o $APP_NAME .
+        run: |
+          make build
+          make zip
+          rm build/**/bootstrap
+          zip -r build.zip build
 
-      - name: Upload executable file as artifact
+      - name: Upload build files as artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.APP_NAME }}
-          path: ${{ env.APP_NAME }}
+          name: build
+          path: build.zip
           if-no-files-found: error
 
   unit-test:
@@ -61,27 +62,13 @@ jobs:
         with:
           go-version: "1.21"
 
-      - run: |
-          go test -tags=unit -coverprofile coverage.out -covermode count ./...
-          go tool cover -func coverage.out
+      - name: Run tests
+        run: go test -tags=unit -coverprofile=coverage.out -covermode=atomic ./...
 
       - uses: actions/upload-artifact@v3
         with:
           name: code-coverage
           path: coverage.out
-
-  code-analysis:
-    needs:
-      - unit-test
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Download coverage output
-        uses: actions/download-artifact@v3
-        with:
-          name: code-coverage
 
       - name: Code analysis
         uses: sonarsource/sonarcloud-github-action@master
@@ -97,7 +84,7 @@ jobs:
 
   security-analysis:
     needs:
-      - code-analysis
+      - unit-test
 
     runs-on: ubuntu-latest
     steps:
@@ -116,25 +103,29 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/download-artifact@v3
+      - name: Download Artifact
+        uses: actions/download-artifact@v3
         with:
-          name: ${{ env.APP_NAME }}
+          name: build
 
-      - run: |
+      - name: Prepare Build Files
+        run: |
+          unzip build.zip
+          rm -rf build.zip
+
+      - name: Prepare Environment Variables
+        run: |
           touch env.dev.json
           echo '{
-            "IS_AT_REMOTE": true,
             "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
             "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
-            "MONGODB_URI": "${{ secrets.DEV_MONGODB_URI }}",
-            "MONGODB_USERNAME": "${{ secrets.DEV_MONGODB_USERNAME }}",
-            "MONGODB_PASSWORD": "${{ secrets.DEV_MONGODB_PASSWORD }}",
-            "MONGODB_DATABASE": "${{ vars.MONGODB_DATABASE }}",
-            "MONGODB_USER_COLLECTION": "${{ vars.MONGODB_USER_COLLECTION }}",
-            "MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION": "${{ vars.MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION }}"
+            "DYNAMODB_USER_TABLE": "${{ secrets.DYNAMODB_USER_TABLE }}",
+            "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ secrets.DYNAMODB_USER_UNIQUENESS_TABLE }}",
+            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ secrets.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
           }' > env.dev.json
 
-      - uses: serverless/github-action@v3.2
+      - name: Deploy To Production Environment
+        uses: serverless/github-action@v3.2
         with:
           args: deploy --stage dev
         env:
@@ -149,25 +140,29 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/download-artifact@v3
+      - name: Download Artifact
+        uses: actions/download-artifact@v3
         with:
-          name: ${{ env.APP_NAME }}
+          name: build
 
-      - run: |
+      - name: Prepare Build Files
+        run: |
+          unzip build.zip
+          rm -rf build.zip
+
+      - name: Prepare Environment Variables
+        run: |
           touch env.production.json
           echo '{
-            "IS_AT_REMOTE": true,
             "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
             "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
-            "MONGODB_URI": "${{ secrets.PROD_MONGODB_URI }}",
-            "MONGODB_USERNAME": "${{ secrets.PROD_MONGODB_USERNAME }}",
-            "MONGODB_PASSWORD": "${{ secrets.PROD_MONGODB_PASSWORD }}",
-            "MONGODB_DATABASE": "${{ vars.MONGODB_DATABASE }}",
-            "MONGODB_USER_COLLECTION": "${{ vars.MONGODB_USER_COLLECTION }}",
-            "MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION": "${{ vars.MONGODB_REFRESH_TOKEN_HISTORY_COLLECTION }}"
+            "DYNAMODB_USER_TABLE": "${{ secrets.DYNAMODB_USER_TABLE }}",
+            "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ secrets.DYNAMODB_USER_UNIQUENESS_TABLE }}",
+            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ secrets.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
           }' > env.production.json
 
-      - uses: serverless/github-action@v3.2
+      - name: Deploy To Production Environment
+        uses: serverless/github-action@v3.2
         with:
           args: deploy --stage production
         env:

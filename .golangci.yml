@@ -28,5 +28,5 @@ severity:
 
 linters-settings:
   funlen:
-    lines: 100
+    lines: 180
     statements: 60

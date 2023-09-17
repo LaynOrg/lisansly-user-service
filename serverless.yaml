@@ -1,43 +1,38 @@
 service: UserAPI
+frameworkVersion: "3"
 
 provider:
   name: aws
-  runtime: go1.x
+  runtime: provided.al2
+  architecture: arm64
   region: us-west-1
-  apiGateway:
-    disableDefaultEndpoint: true
+  environment: ${file(env.${opt:stage, self:provider.stage}.json)}
 
 package:
-  patterns:
-    - "!./**/**"
-    - "user-api"
+  individually: true
 
 functions:
-  UserAPI:
-    handler: user-api
-    environment: ${file(env.${opt:stage, self:provider.stage}.json)}
-    events:
-      - http:
-          method: GET
-          path: /health
-          cors: true
-      - http:
-          method: POST
-          path: /user
-          cors: true
-      - http:
-          method: POST
-          path: /login
-          cors: true
-      - http:
-          method: GET
-          path: /user/{userId}
-          cors: true
-      - http:
-          method: PATCH
-          path: /user/{userId}
-          cors: true
-      - http:
-          method: GET
-          path: /user/{userId}/refreshToken/{refreshToken}
-          cors: true
+  createUser:
+    handler: bootstrap
+    package:
+      artifact: build/createUser/createUser.zip
+
+  login:
+    handler: bootstrap
+    package:
+      artifact: build/login/login.zip
+
+  getUserById:
+    handler: bootstrap
+    package:
+      artifact: build/getUserById/getUserById.zip
+
+  updateUserById:
+    handler: bootstrap
+    package:
+      artifact: build/updateUserById/updateUserById.zip
+
+  getAccessTokenViaRefreshToken:
+    handler: bootstrap
+    package:
+      artifact: build/getAccessTokenViaRefreshToken/getAccessTokenViaRefreshToken.zip

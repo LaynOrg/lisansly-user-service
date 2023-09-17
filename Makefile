@@ -1,20 +1,28 @@
-PROJECT_NAME = $(notdir $(CURDIR))
-
 get:
 	go get ./...
 	go mod tidy
+
+.PHONY: build
+build:
+	env GOOS=linux GOARCH=arm64 go build -o build/createUser/bootstrap internal/createUser/main.go
+	env GOOS=linux GOARCH=arm64 go build -o build/login/bootstrap internal/login/main.go
+	env GOOS=linux GOARCH=arm64 go build -o build/getUserById/bootstrap internal/getUserById/main.go
+	env GOOS=linux GOARCH=arm64 go build -o build/getAccessTokenViaRefreshToken/bootstrap internal/getAccessTokenViaRefreshToken/main.go
+	env GOOS=linux GOARCH=arm64 go build -o build/updateUserById/bootstrap internal/updateUserById/main.go
+
+.PHONY: zip
+zip:
+	zip -j build/createUser/createUser.zip build/createUser/bootstrap
+	zip -j build/login/login.zip build/login/bootstrap
+	zip -j build/getUserById/getUserById.zip build/getUserById/bootstrap
+	zip -j build/getAccessTokenViaRefreshToken/getAccessTokenViaRefreshToken.zip build/getAccessTokenViaRefreshToken/bootstrap
+	zip -j build/updateUserById/updateUserById.zip build/updateUserById/bootstrap
 
 security-analysis:
 	gosec ./...
 
 lint:
 	golangci-lint run -v -c .golangci.yml ./...
-
-dev:
-	air .
-
-run:
-	go run .
 
 test:
 	go clean -testcache

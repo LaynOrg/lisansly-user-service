@@ -1,34 +1,51 @@
 package cerror
 
 import (
+	"context"
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/aws/aws-lambda-go/events"
 	"go.uber.org/zap"
 
 	"user-api/pkg/logger"
 )
 
-const StackSkipAmount = 7
+type (
+	lambdaHandler func(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)
+	errorHandler  func(ctx context.Context, err error) (events.APIGatewayProxyResponse, error)
+)
 
-func Middleware(ctx *fiber.Ctx, err error) error {
+func WithMiddleware(errorHandler errorHandler, handler lambdaHandler) lambdaHandler {
+	return func(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+		response, err := handler(ctx, request)
+		if err != nil {
+			return errorHandler(ctx, err)
+		}
+
+		return response, nil
+	}
+}
+
+func ErrorHandler(ctx context.Context, err error) (events.APIGatewayProxyResponse, error) {
 	var cerr *CustomError
-	ok := errors.As(err, &cerr)
-	if !ok {
-		fiberError := err.(*fiber.Error)
-		return ctx.SendStatus(fiberError.Code)
+	isCerror := errors.As(err, &cerr)
+	if !isCerror {
+		return events.APIGatewayProxyResponse{}, err
 	}
 
-	log := logger.FromContext(ctx.Context()).Desugar()
+	var sugaredLogger *zap.SugaredLogger
+	sugaredLogger, isCerror = logger.FromContext(ctx)
+	if !isCerror {
+		return events.APIGatewayProxyResponse{}, errors.New("InternalServerError")
+	}
+
+	log := sugaredLogger.Desugar()
 	if len(cerr.LogFields) > 0 {
 		for _, field := range cerr.LogFields {
 			log = log.With(field)
 		}
 	}
-	log.WithOptions(
-		zap.WithCaller(false),
-		zap.AddCallerSkip(StackSkipAmount),
-	).Log(cerr.LogSeverity, cerr.LogMessage)
+	log.Log(cerr.LogSeverity, cerr.LogMessage)
 
-	return ctx.SendStatus(cerr.HttpStatusCode)
+	return events.APIGatewayProxyResponse{}, cerr
 }

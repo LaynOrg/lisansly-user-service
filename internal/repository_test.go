@@ -9,648 +9,479 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsCfg "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"user-api/pkg/cerror"
 	"user-api/pkg/config"
 )
 
 const (
-	TestMongoDbUserName = "root"
-	TestMongoDbPassword = "12345"
-
-	TestMongoDbAmbiguousUri                  = "mongodb://localhost:27017"
-	TestMongoDbDatabaseName                  = "lisansly"
-	TestMongoDbUserCollection                = "user"
-	TestMongoDbRefreshTokenHistoryCollection = "refresh-token-history"
+	TestAwsRegion                        = "us-west-1"
+	TestDynamoDbUserTable                = "user"
+	TestDynamoDbUserUniquenessTable      = "user-uniqueness"
+	TestDynamoDbRefreshTokenHistoryTable = "refresh-token-history"
 )
 
 func TestNewRepository(t *testing.T) {
-	userRepository := NewRepository(nil, nil)
+	repository := NewRepository(nil, nil)
 
-	assert.Implements(t, (*Repository)(nil), userRepository)
+	assert.Implements(t, (*Repository)(nil), repository)
 }
 
 func TestRepository_InsertUser(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
+
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createUserTable(t, ctx, dynamodbClient)
+		createUserUniquenessTable(t, ctx, dynamodbClient)
 
 		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
+			dynamodbClient,
+			&config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
 			},
 		)
 
-		userId, err := userRepository.InsertUser(ctx, &Document{
+		cerr := userRepository.InsertUser(ctx, &Table{
 			Id:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.NoError(t, err)
-		assert.NotNil(t, userId)
+		assert.NoError(t, cerr)
 	})
 
-	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
+	t.Run("when user already exist in table should return error", func(t *testing.T) {
 		ctx := context.Background()
-		credentials := options.Client().
-			ApplyURI(TestMongoDbAmbiguousUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
 
-		userRepository := NewRepository(mongoClient, &config.MongodbConfig{})
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		_, err = userRepository.InsertUser(ctx, &Document{
-			Id:       TestUserId,
-			Email:    TestEmail,
-			Password: TestPassword,
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
 		})
+		createUserTable(t, ctx, dynamodbClient)
+		createUserUniquenessTable(t, ctx, dynamodbClient)
 
-		assert.Error(t, err)
-	})
+		fakeUserItem, err := attributevalue.MarshalMap(&Table{
+			Id:        TestUserId,
+			Name:      TestUserName,
+			Email:     TestEmail,
+			Password:  TestPassword,
+			Role:      RoleUser,
+			CreatedAt: time.Now().UTC(),
+		})
+		require.NoError(t, err)
 
-	t.Run("when error occurred insert user document to collection should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
+		fakeUserUniquenessItem, err := attributevalue.MarshalMap(&UniquenessTable{
+			Unique: TestEmail,
+			Type:   UniquenessEmail,
+		})
+		require.NoError(t, err)
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		_, err = dynamodbClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{
+					Put: &types.Put{
+						Item:      fakeUserItem,
+						TableName: aws.String(TestDynamoDbUserTable),
+					},
+				},
+				{
+					Put: &types.Put{
+						Item:      fakeUserUniquenessItem,
+						TableName: aws.String(TestDynamoDbUserUniquenessTable),
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
 
 		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: "",
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
+			dynamodbClient,
+			&config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
 			},
 		)
 
-		_, err = userRepository.InsertUser(ctx, &Document{
+		cerr := userRepository.InsertUser(ctx, &Table{
 			Id:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusConflict,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
+	})
+
+	t.Run("when error occurred insert user item to table should return error", func(t *testing.T) {
+		ctx := context.Background()
+
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
+
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
+
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+
+		userRepository := NewRepository(
+			dynamodbClient,
+			&config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
+				},
+			},
+		)
+
+		cerr := userRepository.InsertUser(ctx, &Table{
+			Id:       TestUserId,
+			Email:    TestEmail,
+			Password: TestPassword,
+		})
+
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusInternalServerError,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
 	})
 }
 
-func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
+func TestRepository_FindUserWithId(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
 
-		client, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(client, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		userRepository := NewRepository(
-			client,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-				},
-			},
-		)
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createUserTable(t, ctx, dynamodbClient)
 
-		RefreshTokenExpiresAt := time.Now().UTC().Add(180 * time.Minute)
-		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
-			Id:        TestRefreshTokenHistoryDocumentId,
-			UserID:    TestUserId,
-			Token:     TestRefreshToken,
-			ExpiresAt: RefreshTokenExpiresAt,
+		now := time.Now().UTC()
+		item, err := attributevalue.MarshalMap(&Table{
+			Id:        TestUserId,
+			Name:      TestUserId,
+			Email:     TestEmail,
+			Password:  TestPassword,
+			Role:      RoleUser,
+			CreatedAt: now,
 		})
 
+		_, err = dynamodbClient.PutItem(
+			ctx,
+			&dynamodb.PutItemInput{
+				Item:      item,
+				TableName: aws.String(TestDynamoDbUserTable),
+			},
+		)
+		require.NoError(t, err)
+
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbUserTable: TestDynamoDbUserTable,
+			},
+		})
+		user, err := repository.FindUserWithId(
+			ctx,
+			TestUserId,
+		)
+
+		assert.Equal(t, &Table{
+			Id:        TestUserId,
+			Name:      TestUserId,
+			Email:     TestEmail,
+			Password:  TestPassword,
+			Role:      RoleUser,
+			CreatedAt: now,
+		}, user)
 		assert.NoError(t, err)
 	})
 
-	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
+	t.Run("when error occurred while find user should return error", func(t *testing.T) {
 		ctx := context.Background()
-		credentials := options.Client().
-			ApplyURI(TestMongoDbAmbiguousUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		userRepository := NewRepository(mongoClient, &config.MongodbConfig{})
-
-		RefreshTokenExpiresAt := time.Now().UTC().Add(180 * time.Minute)
-		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
-			Id:        TestRefreshTokenHistoryDocumentId,
-			UserID:    TestUserId,
-			Token:     TestRefreshToken,
-			ExpiresAt: RefreshTokenExpiresAt,
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = aws.String("localhost:8989")
+			options.Region = TestAwsRegion
 		})
 
-		assert.Error(t, err)
-	})
-
-	t.Run("when error occurred insert refresh token document to collection should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
-
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: "",
-				Collections: map[string]string{
-					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-				},
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
+		})
+		user, cerr := repository.FindUserWithId(
+			ctx,
+			TestUserId,
 		)
 
-		RefreshTokenExpiresAt := time.Now().UTC().Add(180 * time.Minute)
-		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryDocument{
-			Id:        TestRefreshTokenHistoryDocumentId,
-			UserID:    TestUserId,
-			Token:     TestRefreshToken,
-			ExpiresAt: RefreshTokenExpiresAt,
-		})
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusInternalServerError,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
+		assert.Nil(t, user)
+	})
 
-		assert.Error(t, err)
+	t.Run("when user not found in table should return error", func(t *testing.T) {
+		ctx := context.Background()
+
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
+
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
+
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createUserTable(t, ctx, dynamodbClient)
+
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbUserTable: TestDynamoDbUserTable,
+			},
+		})
+		user, cerr := repository.FindUserWithId(
+			ctx,
+			TestUserId,
+		)
+
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusNotFound,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
+		assert.Nil(t, user)
 	})
 }
 
 func TestRepository_FindUserWithEmail(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
-
-		collection := mongoClient.
-			Database(TestMongoDbDatabaseName).
-			Collection(TestMongoDbUserCollection)
-
-		_, err = collection.
-			InsertOne(ctx, &Document{
-				Email:    TestEmail,
-				Password: TestPassword,
-				Role:     RoleUser,
-			})
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
 		require.NoError(t, err)
 
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
-				},
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createUserTable(t, ctx, dynamodbClient)
+
+		now := time.Now().UTC()
+		item, err := attributevalue.MarshalMap(&Table{
+			Id:        TestUserId,
+			Name:      TestUserId,
+			Email:     TestEmail,
+			Password:  TestPassword,
+			Role:      RoleUser,
+			CreatedAt: now,
+		})
+
+		_, err = dynamodbClient.PutItem(
+			ctx,
+			&dynamodb.PutItemInput{
+				Item:      item,
+				TableName: aws.String(TestDynamoDbUserTable),
 			},
 		)
+		require.NoError(t, err)
 
-		user, err := userRepository.FindUserWithEmail(ctx, TestEmail)
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbUserTable: TestDynamoDbUserTable,
+			},
+		})
+		user, err := repository.FindUserWithEmail(
+			ctx,
+			TestEmail,
+		)
 
+		assert.Equal(t, &Table{
+			Id:        TestUserId,
+			Name:      TestUserId,
+			Email:     TestEmail,
+			Password:  TestPassword,
+			Role:      RoleUser,
+			CreatedAt: now,
+		}, user)
 		assert.NoError(t, err)
-		assert.NotEmpty(t, user)
 	})
 
-	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
+	t.Run("when error occurred while find user should return error", func(t *testing.T) {
 		ctx := context.Background()
-		credentials := options.Client().
-			ApplyURI(TestMongoDbAmbiguousUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		userRepository := NewRepository(mongoClient, &config.MongodbConfig{})
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = aws.String("localhost:8989")
+			options.Region = TestAwsRegion
+		})
 
-		_, err = userRepository.FindUserWithEmail(ctx, TestEmail)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("when error occurred find user in collection but can't find one should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
-
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
-				},
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
+		})
+		user, cerr := repository.FindUserWithEmail(
+			ctx,
+			TestEmail,
 		)
 
-		user, err := userRepository.FindUserWithEmail(ctx, TestEmail)
-
-		assert.Error(t, err)
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusInternalServerError,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
 		assert.Nil(t, user)
 	})
 
-	t.Run("when error occurred find user in collection should return error", func(t *testing.T) {
+	t.Run("when user not found should return error", func(t *testing.T) {
 		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
-				},
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createUserTable(t, ctx, dynamodbClient)
+
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
+		})
+		user, cerr := repository.FindUserWithEmail(
+			ctx,
+			TestEmail,
 		)
 
-		_, err = userRepository.FindUserWithEmail(ctx, TestEmail)
-
-		assert.Error(t, err)
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusNotFound,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
+		assert.Nil(t, user)
 	})
 }
 
-func TestRepository_FindUserWithUserId(t *testing.T) {
+func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
 
-		client, err := mongo.Connect(context.TODO(), options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			}))
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
+
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
 		require.NoError(t, err)
 
-		_, err = client.
-			Database(TestMongoDbDatabaseName).
-			Collection(TestMongoDbUserCollection).
-			InsertOne(ctx, &Document{
-				Id:       TestUserId,
-				Email:    TestEmail,
-				Password: TestPassword,
-				Role:     RoleUser,
-			})
-		require.NoError(t, err)
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
 		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
+			dynamodbClient,
+			&config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 				},
 			},
 		)
 
-		user, err := userRepository.FindUserWithId(ctx, TestUserId)
+		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+			Id:        "abcd-abcd-abcd-abcd",
+			UserID:    "abcd-abcd-abcd-abcd",
+			Token:     "abcd.abcd.abcd",
+			ExpiresAt: time.Now().UTC(),
+		})
 
 		assert.NoError(t, err)
-		assert.NotEmpty(t, user)
 	})
 
-	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
+	t.Run("when error occurred while insert user item should return error", func(t *testing.T) {
 		ctx := context.Background()
-		credentials := options.Client().
-			ApplyURI(TestMongoDbAmbiguousUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		userRepository := NewRepository(mongoClient, &config.MongodbConfig{})
-
-		_, err = userRepository.FindUserWithId(ctx, TestEmail)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("when error occurred find user in collection but can't find one should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = aws.String("uri")
+			options.Region = TestAwsRegion
+		})
 
 		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
+			dynamodbClient,
+			&config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 				},
 			},
 		)
 
-		user, err := userRepository.FindUserWithId(ctx, TestEmail)
-
-		assert.Error(t, err)
-		assert.Nil(t, user)
-	})
-
-	t.Run("when error occurred find user in collection should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
-
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
-				},
-			},
-		)
-
-		_, err = userRepository.FindUserWithId(ctx, TestEmail)
+		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+			Id:        "abcd-abcd-abcd-abcd",
+			UserID:    "abcd-abcd-abcd-abcd",
+			Token:     "abcd.abcd.abcd",
+			ExpiresAt: time.Now().UTC(),
+		})
 
 		assert.Error(t, err)
 	})
@@ -659,207 +490,137 @@ func TestRepository_FindUserWithUserId(t *testing.T) {
 func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
 
-		client, err := mongo.Connect(context.TODO(), options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			}))
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
+
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
 		require.NoError(t, err)
 
-		_, err = client.
-			Database(TestMongoDbDatabaseName).
-			Collection(TestMongoDbRefreshTokenHistoryCollection).
-			InsertOne(ctx, &RefreshTokenHistoryDocument{
-				Id:        TestRefreshTokenHistoryDocumentId,
-				Token:     TestRefreshToken,
-				ExpiresAt: time.Now().Add(10 * time.Minute).UTC(),
-				UserID:    TestUserId,
-			})
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
+
+		now := time.Now().UTC().Add(10 * time.Minute)
+		item, err := attributevalue.MarshalMap(&RefreshTokenHistoryTable{
+			Id:        TestRefreshTokenHistoryItemId,
+			UserID:    TestUserId,
+			Token:     TestAccessToken,
+			ExpiresAt: now,
+		})
+
+		_, err = dynamodbClient.PutItem(
+			ctx,
+			&dynamodb.PutItemInput{
+				Item:      item,
+				TableName: aws.String(TestDynamoDbRefreshTokenHistoryTable),
+			},
+		)
 		require.NoError(t, err)
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
-
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-				},
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
+		})
+		user, cerr := repository.FindRefreshTokenWithUserId(
+			ctx,
+			TestUserId,
 		)
 
-		refreshTokenDocument, err := userRepository.FindRefreshTokenWithUserId(ctx, TestUserId)
-
-		assert.NoError(t, err)
-		assert.NotEmpty(t, refreshTokenDocument)
+		assert.Equal(t, &RefreshTokenHistoryTable{
+			Id:        TestRefreshTokenHistoryItemId,
+			UserID:    TestUserId,
+			Token:     TestAccessToken,
+			ExpiresAt: now,
+		}, user)
+		assert.NoError(t, cerr)
 	})
 
-	t.Run("when error occurred while connecting to database should return error", func(t *testing.T) {
+	t.Run("when error occurred while find user should return error", func(t *testing.T) {
 		ctx := context.Background()
-		credentials := options.Client().
-			ApplyURI(TestMongoDbAmbiguousUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		userRepository := NewRepository(mongoClient, &config.MongodbConfig{})
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = aws.String("localhost:8989")
+			options.Region = TestAwsRegion
+		})
 
-		_, err = userRepository.FindRefreshTokenWithUserId(ctx, TestEmail)
-
-		assert.Error(t, err)
-	})
-
-	t.Run("when error occurred find refresh token history in collection but can't find one should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
-
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-				},
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
+		})
+		user, cerr := repository.FindRefreshTokenWithUserId(
+			ctx,
+			TestUserId,
 		)
 
-		refreshToken, err := userRepository.FindRefreshTokenWithUserId(ctx, TestEmail)
-
-		assert.Nil(t, refreshToken)
-		assert.Error(t, err)
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusInternalServerError,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
+		assert.Nil(t, user)
 	})
 
-	t.Run("when error occurred find refresh token history in collection should return error", func(t *testing.T) {
+	t.Run("when refresh token not found should return error", func(t *testing.T) {
 		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
+		container, uri := setupDynamoDbContainer(t, ctx)
+		defer container.Terminate(ctx)
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		if err != nil {
-			panic(err)
-		}
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}(mongoClient, ctx)
+		cfg, err := awsCfg.LoadDefaultConfig(ctx)
+		require.NoError(t, err)
 
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongoDbRefreshTokenHistoryCollection: TestMongoDbRefreshTokenHistoryCollection,
-				},
+		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = uri
+			options.Region = TestAwsRegion
+		})
+		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
+
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
+		})
+		user, cerr := repository.FindRefreshTokenWithUserId(
+			ctx,
+			TestUserId,
 		)
 
-		refreshToken, err := userRepository.FindRefreshTokenWithUserId(ctx, TestEmail)
-
-		assert.Nil(t, refreshToken)
-		assert.Error(t, err)
+		assert.Error(t, cerr)
+		assert.Equal(t,
+			http.StatusNotFound,
+			cerr.(*cerror.CustomError).HttpStatusCode,
+		)
+		assert.Nil(t, user)
 	})
 }
 
 func TestRepository_UpdateUserById(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
+		t.Run("with email", func(t *testing.T) {
+			ctx := context.Background()
 
-		client, err := mongo.Connect(context.TODO(), options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			}))
-		require.NoError(t, err)
+			container, uri := setupDynamoDbContainer(t, ctx)
+			defer container.Terminate(ctx)
 
-		_, err = client.
-			Database(TestMongoDbDatabaseName).
-			Collection(TestMongoDbUserCollection).
-			InsertOne(ctx, &Document{
+			cfg, err := awsCfg.LoadDefaultConfig(ctx)
+			require.NoError(t, err)
+
+			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+				options.BaseEndpoint = uri
+				options.Region = TestAwsRegion
+			})
+			createUserTable(t, ctx, dynamodbClient)
+			createUserUniquenessTable(t, ctx, dynamodbClient)
+
+			fakeUserItem, err := attributevalue.MarshalMap(&Table{
 				Id:        TestUserId,
 				Name:      TestUserName,
 				Email:     TestEmail,
@@ -867,214 +628,377 @@ func TestRepository_UpdateUserById(t *testing.T) {
 				Role:      RoleUser,
 				CreatedAt: time.Now().UTC(),
 			})
-		require.NoError(t, err)
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			})
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		require.NoError(t, err)
-
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
 			require.NoError(t, err)
-		}(mongoClient, ctx)
 
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
+			fakeUserUniquenessItem, err := attributevalue.MarshalMap(&UniquenessTable{
+				Unique: TestEmail,
+				Type:   UniquenessEmail,
+			})
+			require.NoError(t, err)
+
+			_, err = dynamodbClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+				TransactItems: []types.TransactWriteItem{
+					{
+						Put: &types.Put{
+							Item:      fakeUserItem,
+							TableName: aws.String(TestDynamoDbUserTable),
+						},
+					},
+					{
+						Put: &types.Put{
+							Item:      fakeUserUniquenessItem,
+							TableName: aws.String(TestDynamoDbUserUniquenessTable),
+						},
+					},
 				},
-			},
-		)
+			})
+			require.NoError(t, err)
 
-		repositoryError := userRepository.UpdateUserById(ctx, TestUserId, &UpdateUserPayload{
-			Name:     "UPDATED-NAME",
-			Email:    "updatedTest@test.com",
-			Password: "updated-test-password",
-		})
-
-		var user *Document
-		err = client.
-			Database(TestMongoDbDatabaseName).
-			Collection(TestMongoDbUserCollection).
-			FindOne(ctx, bson.D{{"_id", TestUserId}}).
-			Decode(&user)
-		require.NoError(t, err)
-
-		assert.NoError(t, repositoryError)
-		assert.Equal(t, user.Name, "UPDATED-NAME")
-		assert.Equal(t, user.Email, "updatedTest@test.com")
-		assert.Equal(t, user.Password, "updated-test-password")
-	})
-
-	t.Run("when attempt to update email field same email address already exist in collection should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
-
-		client, err := mongo.Connect(context.TODO(), options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-			}))
-		require.NoError(t, err)
-
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
+			repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
+				},
 			})
 
-		collection := client.
-			Database(TestMongoDbDatabaseName).
-			Collection(TestMongoDbUserCollection)
+			cerr := repository.UpdateUserById(
+				ctx,
+				TestUserId,
+				&UpdateUserPayload{
+					Name:     TestUserName,
+					Email:    "new-test@test.com",
+					Password: TestPassword,
+				},
+			)
 
-		_, err = collection.Indexes().CreateOne(ctx, mongo.IndexModel{
-			Keys:    bson.M{"email": 1},
-			Options: options.Index().SetUnique(true),
+			assert.NoError(t, cerr)
 		})
-		require.NoError(t, err)
 
-		_, err = collection.
-			InsertOne(ctx, &Document{
+		t.Run("without email", func(t *testing.T) {
+			ctx := context.Background()
+
+			container, uri := setupDynamoDbContainer(t, ctx)
+			defer container.Terminate(ctx)
+
+			cfg, err := awsCfg.LoadDefaultConfig(ctx)
+			require.NoError(t, err)
+
+			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+				options.BaseEndpoint = uri
+				options.Region = TestAwsRegion
+			})
+			createUserTable(t, ctx, dynamodbClient)
+			createUserUniquenessTable(t, ctx, dynamodbClient)
+
+			fakeUserItem, err := attributevalue.MarshalMap(&Table{
 				Id:        TestUserId,
 				Name:      TestUserName,
-				Email:     "test@test.com",
+				Email:     TestEmail,
 				Password:  TestPassword,
 				Role:      RoleUser,
 				CreatedAt: time.Now().UTC(),
 			})
-		require.NoError(t, err)
-
-		_, err = collection.
-			InsertOne(ctx, &Document{
-				Id:        "updateUser",
-				Name:      TestUserName,
-				Email:     "test2@test.com",
-				Password:  TestPassword,
-				Role:      RoleUser,
-				CreatedAt: time.Now().UTC(),
-			})
-		require.NoError(t, err)
-
-		err = client.Disconnect(ctx)
-		require.NoError(t, err)
-
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		require.NoError(t, err)
-
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
 			require.NoError(t, err)
-		}(mongoClient, ctx)
 
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
+			fakeUserUniquenessItem, err := attributevalue.MarshalMap(&UniquenessTable{
+				Unique: TestEmail,
+				Type:   UniquenessEmail,
+			})
+			require.NoError(t, err)
+
+			_, err = dynamodbClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+				TransactItems: []types.TransactWriteItem{
+					{
+						Put: &types.Put{
+							Item:      fakeUserItem,
+							TableName: aws.String(TestDynamoDbUserTable),
+						},
+					},
+					{
+						Put: &types.Put{
+							Item:      fakeUserUniquenessItem,
+							TableName: aws.String(TestDynamoDbUserUniquenessTable),
+						},
+					},
 				},
-			},
-		)
+			})
+			require.NoError(t, err)
 
-		repositoryError := userRepository.UpdateUserById(ctx, "updateUser", &UpdateUserPayload{
-			Name:     "UPDATED-NAME",
-			Email:    "test@test.com",
-			Password: "updated-test-password",
+			repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
+				},
+			})
+
+			cerr := repository.UpdateUserById(
+				ctx,
+				TestUserId,
+				&UpdateUserPayload{
+					Name:     TestUserName,
+					Password: TestPassword,
+				},
+			)
+
+			assert.NoError(t, cerr)
 		})
-
-		assert.Error(t, repositoryError)
-		assert.Equal(t, http.StatusConflict, repositoryError.(*cerror.CustomError).HttpStatusCode)
 	})
 
-	t.Run("when attempt to update not exist user should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container := setupMongoDbContainer(t, ctx)
-		mongodbUri, err := container.Endpoint(ctx, "mongodb")
-		if err != nil {
-			t.Error(fmt.Errorf("failed to get endpoint: %w", err))
-		}
+	t.Run("with email field error cases", func(t *testing.T) {
+		t.Run("when error occurred while find user should return error", func(t *testing.T) {
+			ctx := context.Background()
 
-		credentials := options.Client().
-			ApplyURI(mongodbUri).
-			SetAuth(options.Credential{
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
+			cfg, err := awsCfg.LoadDefaultConfig(ctx)
+			require.NoError(t, err)
+
+			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+				options.BaseEndpoint = aws.String("localhost:8989")
+				options.Region = TestAwsRegion
 			})
 
-		mongoClient, err := mongo.Connect(ctx, credentials)
-		require.NoError(t, err)
-
-		defer func(client *mongo.Client, ctx context.Context) {
-			err := client.Disconnect(ctx)
-			require.NoError(t, err)
-		}(mongoClient, ctx)
-
-		userRepository := NewRepository(
-			mongoClient,
-			&config.MongodbConfig{
-				Uri:      mongodbUri,
-				Username: TestMongoDbUserName,
-				Password: TestMongoDbPassword,
-				Database: TestMongoDbDatabaseName,
-				Collections: map[string]string{
-					config.MongodbUserCollection: TestMongoDbUserCollection,
+			repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
-			},
-		)
+			})
 
-		repositoryError := userRepository.UpdateUserById(ctx, TestUserId, &UpdateUserPayload{
-			Name:     "UPDATED-NAME",
-			Email:    "updatedTest@test.com",
-			Password: "updated-test-password",
+			cerr := repository.UpdateUserById(
+				ctx,
+				TestUserId,
+				&UpdateUserPayload{
+					Name:     TestUserName,
+					Email:    "new-test@test.com",
+					Password: TestPassword,
+				},
+			)
+
+			assert.Error(t, cerr)
+			assert.Equal(t,
+				http.StatusInternalServerError,
+				cerr.(*cerror.CustomError).HttpStatusCode,
+			)
 		})
 
-		assert.Error(t, repositoryError)
-		assert.Equal(t, http.StatusNotFound, repositoryError.(*cerror.CustomError).HttpStatusCode)
+		t.Run("when user not found should return error", func(t *testing.T) {
+			ctx := context.Background()
+
+			container, uri := setupDynamoDbContainer(t, ctx)
+			defer container.Terminate(ctx)
+
+			cfg, err := awsCfg.LoadDefaultConfig(ctx)
+			require.NoError(t, err)
+
+			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+				options.BaseEndpoint = uri
+				options.Region = TestAwsRegion
+			})
+			createUserTable(t, ctx, dynamodbClient)
+
+			repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
+				},
+			})
+
+			cerr := repository.UpdateUserById(
+				ctx,
+				TestUserId,
+				&UpdateUserPayload{
+					Name:     TestUserName,
+					Email:    "new-test@test.com",
+					Password: TestPassword,
+				},
+			)
+
+			assert.Error(t, cerr)
+			assert.Equal(t,
+				http.StatusNotFound,
+				cerr.(*cerror.CustomError).HttpStatusCode,
+			)
+		})
+
+		t.Run("when error occurred while update user should return error", func(t *testing.T) {
+			ctx := context.Background()
+
+			container, uri := setupDynamoDbContainer(t, ctx)
+			defer container.Terminate(ctx)
+
+			cfg, err := awsCfg.LoadDefaultConfig(ctx)
+			require.NoError(t, err)
+
+			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+				options.BaseEndpoint = uri
+				options.Region = TestAwsRegion
+			})
+			createUserTable(t, ctx, dynamodbClient)
+
+			fakeUserItem, err := attributevalue.MarshalMap(&Table{
+				Id:        TestUserId,
+				Name:      TestUserName,
+				Email:     TestEmail,
+				Password:  TestPassword,
+				Role:      RoleUser,
+				CreatedAt: time.Now().UTC(),
+			})
+			require.NoError(t, err)
+
+			_, err = dynamodbClient.PutItem(ctx, &dynamodb.PutItemInput{
+				Item:      fakeUserItem,
+				TableName: aws.String(TestDynamoDbUserTable),
+			})
+			require.NoError(t, err)
+
+			repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
+				},
+			})
+
+			cerr := repository.UpdateUserById(
+				ctx,
+				TestUserId,
+				&UpdateUserPayload{
+					Name:     TestUserName,
+					Email:    "new-test@test.com",
+					Password: TestPassword,
+				},
+			)
+
+			assert.Error(t, cerr)
+			assert.Equal(t,
+				http.StatusInternalServerError,
+				cerr.(*cerror.CustomError).HttpStatusCode,
+			)
+		})
+	})
+
+	t.Run("without email field error cases", func(t *testing.T) {
+		t.Run("error occurred while update user without email field should return error", func(t *testing.T) {
+			ctx := context.Background()
+
+			cfg, err := awsCfg.LoadDefaultConfig(ctx)
+			require.NoError(t, err)
+
+			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+				options.BaseEndpoint = aws.String("localhost:8989")
+				options.Region = TestAwsRegion
+			})
+
+			repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbUserTable:           TestDynamoDbUserTable,
+					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
+				},
+			})
+
+			cerr := repository.UpdateUserById(
+				ctx,
+				TestUserId,
+				&UpdateUserPayload{
+					Name:     TestUserName,
+					Password: TestPassword,
+				},
+			)
+
+			assert.Error(t, cerr)
+			assert.Equal(t,
+				http.StatusInternalServerError,
+				cerr.(*cerror.CustomError).HttpStatusCode,
+			)
+		})
 	})
 }
 
-func setupMongoDbContainer(t *testing.T, ctx context.Context) testcontainers.Container {
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "mongo",
-			ExposedPorts: []string{"27017/tcp"},
-			Env: map[string]string{
-				"MONGO_INITDB_ROOT_USERNAME": TestMongoDbUserName,
-				"MONGO_INITDB_ROOT_PASSWORD": TestMongoDbPassword,
+func createRefreshTokenHistoryTable(t *testing.T, ctx context.Context, dynamodbClient *dynamodb.Client) {
+	_, err := dynamodbClient.CreateTable(ctx, &dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{
+			{
+				AttributeName: aws.String("id"),
+				AttributeType: types.ScalarAttributeTypeS,
 			},
-			WaitingFor: wait.ForExposedPort(),
 		},
-		Started: true,
+		KeySchema: []types.KeySchemaElement{
+			{
+				AttributeName: aws.String("id"),
+				KeyType:       types.KeyTypeHash,
+			},
+		},
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(5),
+			WriteCapacityUnits: aws.Int64(5),
+		},
+		TableName: aws.String(TestDynamoDbRefreshTokenHistoryTable),
 	})
-	if err != nil {
-		t.Fatal(err)
+	require.NoError(t, err)
+}
+
+func createUserTable(t *testing.T, ctx context.Context, dynamodbClient *dynamodb.Client) {
+	_, err := dynamodbClient.CreateTable(ctx, &dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{
+			{
+				AttributeName: aws.String("id"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+		},
+		KeySchema: []types.KeySchemaElement{
+			{
+				AttributeName: aws.String("id"),
+				KeyType:       types.KeyTypeHash,
+			},
+		},
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(5),
+			WriteCapacityUnits: aws.Int64(5),
+		},
+		TableName: aws.String(TestDynamoDbUserTable),
+	})
+	require.NoError(t, err)
+}
+
+func createUserUniquenessTable(t *testing.T, ctx context.Context, dynamodbClient *dynamodb.Client) {
+	_, err := dynamodbClient.CreateTable(ctx, &dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{
+			{
+				AttributeName: aws.String("unique"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+		},
+		KeySchema: []types.KeySchemaElement{
+			{
+				AttributeName: aws.String("unique"),
+				KeyType:       types.KeyTypeHash,
+			},
+		},
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(5),
+			WriteCapacityUnits: aws.Int64(5),
+		},
+		TableName: aws.String(TestDynamoDbUserUniquenessTable),
+	})
+	require.NoError(t, err)
+}
+
+func setupDynamoDbContainer(t *testing.T, ctx context.Context) (testcontainers.Container, *string) {
+	req := testcontainers.ContainerRequest{
+		Image:        "amazon/dynamodb-local",
+		ExposedPorts: []string{"8000/tcp"},
+		WaitingFor:   wait.NewHostPortStrategy("8000"),
 	}
 
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Fatalf("failed to terminate container: %s", err)
-		}
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
 	})
+	require.NoError(t, err)
 
-	return container
+	ip, err := container.Host(ctx)
+	require.NoError(t, err)
+
+	port, err := container.MappedPort(ctx, "8000")
+	require.NoError(t, err)
+
+	return container, aws.String(fmt.Sprintf("http://%s:%s", ip, port))
 }

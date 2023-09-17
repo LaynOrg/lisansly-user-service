@@ -1,215 +1,432 @@
 package user
 
 import (
+	"context"
+	"net/http"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v2"
+	"github.com/goccy/go-json"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"user-api/pkg/cerror"
 	"user-api/pkg/jwt_generator"
 	"user-api/pkg/logger"
-	"user-api/pkg/server"
 )
 
 type Handler interface {
-	server.Handler
-	CreateUser(ctx *fiber.Ctx) error
-	UpdateUserById(ctx *fiber.Ctx) error
-	Login(ctx *fiber.Ctx) error
-	GetAccessTokenByRefreshToken(ctx *fiber.Ctx) error
+	CreateUser(
+		ctx context.Context,
+		request events.APIGatewayProxyRequest,
+	) (
+		events.APIGatewayProxyResponse,
+		error,
+	)
+	Login(
+		ctx context.Context,
+		request events.APIGatewayProxyRequest,
+	) (
+		events.APIGatewayProxyResponse,
+		error,
+	)
+	GetUserById(
+		ctx context.Context,
+		request events.APIGatewayProxyRequest,
+	) (
+		events.APIGatewayProxyResponse,
+		error,
+	)
+	UpdateUserById(
+		ctx context.Context,
+		request events.APIGatewayProxyRequest,
+	) (
+		events.APIGatewayProxyResponse,
+		error,
+	)
+	GetAccessTokenViaRefreshToken(
+		ctx context.Context,
+		request events.APIGatewayProxyRequest,
+	) (
+		events.APIGatewayProxyResponse,
+		error,
+	)
 }
 
 type handler struct {
-	userService    Service
-	userRepository Repository
-	validate       *validator.Validate
+	service    Service
+	repository Repository
+	logger     *zap.SugaredLogger
+	validate   *validator.Validate
 }
 
-func (h *handler) RegisterRoutes(app *fiber.App) {
-	app.Post("/user", h.CreateUser)
-	app.Post("/login", h.Login)
-	app.Get("/user/:userId", h.GetUserById)
-	app.Patch("/user/:userId", h.UpdateUserById)
-	app.Get("/user/:userId/refreshToken/:refreshToken", h.GetAccessTokenByRefreshToken)
-}
-
-func NewHandler(userService Service, userRepository Repository) Handler {
-	validate := validator.New()
+func NewHandler(
+	service Service,
+	repository Repository,
+	logger *zap.SugaredLogger,
+	validate *validator.Validate,
+) Handler {
 	return &handler{
-		userService:    userService,
-		userRepository: userRepository,
-		validate:       validate,
+		service:    service,
+		repository: repository,
+		logger:     logger,
+		validate:   validate,
 	}
 }
 
-func (h *handler) CreateUser(ctx *fiber.Ctx) error {
-	var err error
+func (h *handler) CreateUser(
+	ctx context.Context,
+	request events.APIGatewayProxyRequest,
+) (
+	events.APIGatewayProxyResponse,
+	error,
+) {
+	var (
+		err error
+		log = h.logger
+	)
 
-	log := logger.FromContext(ctx.Context()).
-		With(zap.String("eventName", "register"))
-	logger.InjectContext(ctx.Context(), log)
+	lc, ok := lambdacontext.FromContext(ctx)
+	if ok {
+		log.With(zap.String("requestId", lc.AwsRequestID))
+	}
+	ctx = logger.InjectContext(ctx, log)
 
-	var user *RegisterPayload
-	err = ctx.BodyParser(&user)
+	var registerPayload *RegisterPayload
+	err = json.Unmarshal([]byte(request.Body), &registerPayload)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zapcore.Field{
-			zap.Any("body", ctx.Body()),
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
 
-		return cerr
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
-	err = h.validate.Struct(user)
+	err = h.validate.Struct(registerPayload)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zapcore.Field{
-			zap.Any("body", ctx.Body()),
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
 
-		return cerr
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
 	var tokens *jwt_generator.Tokens
-	tokens, err = h.userService.Register(ctx.Context(), user)
+	tokens, err = h.service.Register(ctx, registerPayload)
 	if err != nil {
-		return err
+		return events.APIGatewayProxyResponse{}, err
 	}
 
-	log.Info(logger.EventFinishedSuccessfully)
-	return ctx.
-		Status(fiber.StatusCreated).
-		JSON(tokens)
+	var responseBody []byte
+	responseBody, err = json.Marshal(&tokens)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshalling response body",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	log.Info(logger.LoggerEventFinished)
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusCreated,
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+		Body: string(responseBody),
+	}, nil
 }
 
-func (h *handler) GetUserById(ctx *fiber.Ctx) error {
-	var err error
+func (h *handler) Login(
+	ctx context.Context,
+	request events.APIGatewayProxyRequest,
+) (
+	events.APIGatewayProxyResponse,
+	error,
+) {
+	var (
+		err error
+		log = h.logger
+	)
 
-	userId := ctx.Params("userId")
-	log := logger.FromContext(ctx.Context()).
-		With(
-			zap.String("eventName", "getUserById"),
-			zap.String("userId", userId),
+	lc, ok := lambdacontext.FromContext(ctx)
+	if ok {
+		log.With(zap.String("requestId", lc.AwsRequestID))
+	}
+	ctx = logger.InjectContext(ctx, log)
+
+	var loginPayload *LoginPayload
+	err = json.Unmarshal([]byte(request.Body), &loginPayload)
+	if err != nil {
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
+		}
+
+		return events.APIGatewayProxyResponse{}, cerr
+	}
+
+	err = h.validate.Struct(loginPayload)
+	if err != nil {
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
+		}
+
+		return events.APIGatewayProxyResponse{}, cerr
+	}
+
+	var tokens *jwt_generator.Tokens
+	tokens, err = h.service.Login(ctx, loginPayload)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	var responseBody []byte
+	responseBody, err = json.Marshal(&tokens)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshalling response body",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	h.logger.Info(logger.LoggerEventFinished)
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+		Body: string(responseBody),
+	}, nil
+}
+
+func (h *handler) GetUserById(
+	ctx context.Context,
+	request events.APIGatewayProxyRequest,
+) (
+	events.APIGatewayProxyResponse,
+	error,
+) {
+	var (
+		err error
+		log = h.logger
+	)
+
+	lc, ok := lambdacontext.FromContext(ctx)
+	if ok {
+		log = log.With(zap.String("requestId", lc.AwsRequestID))
+	}
+
+	var requestBody *GetUserByIdPayload
+	err = json.Unmarshal([]byte(request.Body), &requestBody)
+	if err != nil {
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
+		}
+
+		return events.APIGatewayProxyResponse{}, cerr
+	}
+
+	userId := requestBody.UserId
+	log = log.With(
+		zap.String("userId", userId),
+	)
+	ctx = logger.InjectContext(ctx, log)
+
+	err = h.validate.Struct(requestBody)
+	if err != nil {
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
+		}
+
+		return events.APIGatewayProxyResponse{}, cerr
+	}
+
+	var userDocument *Table
+	userDocument, err = h.repository.FindUserWithId(ctx, userId)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	var payload []byte
+	payload, err = json.Marshal(userDocument)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshalling error",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	log.Info(logger.LoggerEventFinished)
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+		Body:            string(payload),
+		IsBase64Encoded: false,
+	}, nil
+}
+
+func (h *handler) UpdateUserById(
+	ctx context.Context,
+	request events.APIGatewayProxyRequest,
+) (
+	events.APIGatewayProxyResponse,
+	error,
+) {
+	var (
+		err error
+		log = h.logger
+	)
+
+	lambdaContext, ok := lambdacontext.FromContext(ctx)
+	if ok {
+		log = log.With(
+			zap.String("requestId", lambdaContext.AwsRequestID),
 		)
-	logger.InjectContext(ctx.Context(), log)
-
-	var user *Document
-	user, err = h.userRepository.FindUserWithId(ctx.Context(), userId)
-	if err != nil {
-		return err
 	}
 
-	log.Info(logger.EventFinishedSuccessfully)
-	return ctx.
-		Status(fiber.StatusOK).
-		JSON(user)
-}
-
-func (h *handler) UpdateUserById(ctx *fiber.Ctx) error {
-	var err error
-
-	userId := ctx.Params("userId")
-
-	log := logger.FromContext(ctx.Context()).
-		With(
-			zap.String("eventName", "updateUserById"),
-			zap.String("userId", userId),
-		)
-	logger.InjectContext(ctx.Context(), log)
-
-	var user *UpdateUserPayload
-	err = ctx.BodyParser(&user)
-	if err != nil {
-		err = cerror.ErrorBadRequest
-		err.(*cerror.CustomError).LogFields = []zapcore.Field{
-			zap.Any("body", ctx.Body()),
-		}
-		return err
-	}
-
-	err = h.validate.Struct(user)
+	var requestPayload *UpdateUserPayload
+	err = json.Unmarshal([]byte(request.Body), &requestPayload)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zapcore.Field{
-			zap.Any("body", ctx.Body()),
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
 
-		return cerr
+		return events.APIGatewayProxyResponse{}, cerr
+	}
+
+	userId := requestPayload.UserId
+	log = log.With(
+		zap.String("userId", userId),
+	)
+	ctx = logger.InjectContext(ctx, log)
+
+	err = h.validate.Struct(requestPayload)
+	if err != nil {
+		cerr := cerror.ErrorBadRequest
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
+		}
+
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
 	var tokens *jwt_generator.Tokens
-	tokens, err = h.userService.UpdateUserById(ctx.Context(), userId, user)
+	tokens, err = h.service.UpdateUserById(ctx, userId, requestPayload)
 	if err != nil {
-		return err
+		return events.APIGatewayProxyResponse{}, err
 	}
 
-	log.Info(logger.EventFinishedSuccessfully)
-	return ctx.
-		Status(fiber.StatusOK).
-		JSON(tokens)
+	var responseBody []byte
+	responseBody, err = json.Marshal(tokens)
+	if err != nil {
+		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshalling response body",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	log.Info(logger.LoggerEventFinished)
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+		Body: string(responseBody),
+	}, nil
 }
 
-func (h *handler) Login(ctx *fiber.Ctx) error {
-	var err error
+func (h *handler) GetAccessTokenViaRefreshToken(
+	ctx context.Context,
+	request events.APIGatewayProxyRequest,
+) (
+	events.APIGatewayProxyResponse,
+	error,
+) {
+	var (
+		err error
+		log = h.logger
+	)
 
-	log := logger.FromContext(ctx.Context()).
-		With(zap.String("eventName", "login"))
-	logger.InjectContext(ctx.Context(), log)
+	lc, ok := lambdacontext.FromContext(ctx)
+	if ok {
+		log = log.With(zap.String("requestId", lc.AwsRequestID))
+	}
+	ctx = logger.InjectContext(ctx, log)
 
-	var user *LoginPayload
-	err = ctx.BodyParser(&user)
+	var requestBody *GetAccessTokenViaRefreshTokenPayload
+	err = json.Unmarshal([]byte(request.Body), &requestBody)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zapcore.Field{
-			zap.Any("body", ctx.Body()),
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
 
-		return cerr
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
-	err = h.validate.Struct(user)
+	err = h.validate.Struct(requestBody)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zapcore.Field{
-			zap.Any("param", ctx.AllParams()),
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
 
-		return cerr
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
-	var tokens *jwt_generator.Tokens
-	tokens, err = h.userService.Login(ctx.Context(), user)
+	var accessToken *AccessTokenPayload
+	accessToken, err = h.service.GetAccessTokenByRefreshToken(
+		ctx,
+		requestBody.UserId,
+		requestBody.RefreshToken,
+	)
 	if err != nil {
-		return err
+		return events.APIGatewayProxyResponse{}, err
 	}
 
-	log.Info(logger.EventFinishedSuccessfully)
-	return ctx.
-		Status(fiber.StatusOK).
-		JSON(tokens)
-}
-
-func (h *handler) GetAccessTokenByRefreshToken(ctx *fiber.Ctx) error {
-	var err error
-
-	log := logger.FromContext(ctx.Context()).
-		With(zap.String("eventName", "getAccessToken"))
-	logger.InjectContext(ctx.Context(), log)
-
-	userId := ctx.Params("userId")
-	refreshToken := ctx.Params("refreshToken")
-
-	var accessToken string
-	accessToken, err = h.userService.GetAccessTokenByRefreshToken(ctx.Context(), userId, refreshToken)
+	var responseBody []byte
+	responseBody, err = json.Marshal(&accessToken)
 	if err != nil {
-		return err
+		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshalling response body",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
 	}
 
-	log.Info(logger.EventFinishedSuccessfully)
-	return ctx.
-		Status(fiber.StatusOK).
-		JSON(fiber.Map{
-			"accessToken": accessToken,
-		})
+	log.Info(logger.LoggerEventFinished)
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+		Body: string(responseBody),
+	}, nil
 }

@@ -35,10 +35,10 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 }
 
 // FindRefreshTokenWithUserId mocks base method.
-func (m *MockRepository) FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryDocument, error) {
+func (m *MockRepository) FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindRefreshTokenWithUserId", ctx, userId)
-	ret0, _ := ret[0].(*RefreshTokenHistoryDocument)
+	ret0, _ := ret[0].(*RefreshTokenHistoryTable)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -50,10 +50,10 @@ func (mr *MockRepositoryMockRecorder) FindRefreshTokenWithUserId(ctx, userId int
 }
 
 // FindUserWithEmail mocks base method.
-func (m *MockRepository) FindUserWithEmail(ctx context.Context, email string) (*Document, error) {
+func (m *MockRepository) FindUserWithEmail(ctx context.Context, email string) (*Table, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindUserWithEmail", ctx, email)
-	ret0, _ := ret[0].(*Document)
+	ret0, _ := ret[0].(*Table)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -65,10 +65,10 @@ func (mr *MockRepositoryMockRecorder) FindUserWithEmail(ctx, email interface{}) 
 }
 
 // FindUserWithId mocks base method.
-func (m *MockRepository) FindUserWithId(ctx context.Context, userId string) (*Document, error) {
+func (m *MockRepository) FindUserWithId(ctx context.Context, userId string) (*Table, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindUserWithId", ctx, userId)
-	ret0, _ := ret[0].(*Document)
+	ret0, _ := ret[0].(*Table)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -80,7 +80,7 @@ func (mr *MockRepositoryMockRecorder) FindUserWithId(ctx, userId interface{}) *g
 }
 
 // InsertRefreshTokenHistory mocks base method.
-func (m *MockRepository) InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryDocument) error {
+func (m *MockRepository) InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertRefreshTokenHistory", ctx, refreshTokenHistory)
 	ret0, _ := ret[0].(error)
@@ -94,12 +94,11 @@ func (mr *MockRepositoryMockRecorder) InsertRefreshTokenHistory(ctx, refreshToke
 }
 
 // InsertUser mocks base method.
-func (m *MockRepository) InsertUser(ctx context.Context, user *Document) (string, error) {
+func (m *MockRepository) InsertUser(ctx context.Context, user *Table) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertUser", ctx, user)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // InsertUser indicates an expected call of InsertUser.
