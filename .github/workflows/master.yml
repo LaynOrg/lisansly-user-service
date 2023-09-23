@@ -96,6 +96,7 @@ jobs:
           args: ./...
 
   deploy-to-dev:
+    environment: dev
     needs:
       - security-analysis
 
@@ -119,9 +120,9 @@ jobs:
           echo '{
             "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
             "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
-            "DYNAMODB_USER_TABLE": "${{ secrets.DYNAMODB_USER_TABLE }}",
-            "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ secrets.DYNAMODB_USER_UNIQUENESS_TABLE }}",
-            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ secrets.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
+            "DYNAMODB_USER_TABLE": "${{ vars.DYNAMODB_USER_TABLE }}",
+            "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ vars.DYNAMODB_USER_UNIQUENESS_TABLE }}",
+            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ vars.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
           }' > env.dev.json
 
       - name: Deploy To Production Environment
@@ -133,6 +134,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   deploy-to-prod:
+    environment: production
     needs:
       - deploy-to-dev
 
@@ -156,9 +158,9 @@ jobs:
           echo '{
             "JWT_PRIVATE_KEY": "${{ secrets.JWT_PRIVATE_KEY }}",
             "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
-            "DYNAMODB_USER_TABLE": "${{ secrets.DYNAMODB_USER_TABLE }}",
-            "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ secrets.DYNAMODB_USER_UNIQUENESS_TABLE }}",
-            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ secrets.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
+            "DYNAMODB_USER_TABLE": "${{ vars.DYNAMODB_USER_TABLE }}",
+            "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ vars.DYNAMODB_USER_UNIQUENESS_TABLE }}",
+            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ vars.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
           }' > env.production.json
 
       - name: Deploy To Production Environment
