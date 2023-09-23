@@ -99,14 +99,14 @@ func TestReadJwtConfig(t *testing.T) {
 	t.Run("empty public key", func(t *testing.T) {
 		var err error
 
-		err = os.Setenv(JwtPublicKey, "jwt-public-key")
+		err = os.Setenv(JwtPrivateKey, "jwt-private-key")
 		require.NoError(t, err)
 
 		defer os.Clearenv()
 
 		jwtConfig, err := ReadJwtConfig()
 
-		assert.Equal(t, err, fmt.Errorf(EnvironmentVariableNotDefined, JwtPrivateKey))
+		assert.Equal(t, err, fmt.Errorf(EnvironmentVariableNotDefined, JwtPublicKey))
 		assert.Empty(t, jwtConfig)
 	})
 }

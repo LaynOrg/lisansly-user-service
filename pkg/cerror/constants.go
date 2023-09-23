@@ -1,6 +1,7 @@
 package cerror
 
 import (
+	"go.uber.org/zap"
 	"net/http"
 
 	"go.uber.org/zap/zapcore"
@@ -23,5 +24,23 @@ var (
 		HttpStatusCode: http.StatusInternalServerError,
 		LogMessage:     "error occurred while generate access token",
 		LogSeverity:    zapcore.ErrorLevel,
+	}
+
+	ErrorJsonMarshalling = &CustomError{
+		HttpStatusCode: http.StatusInternalServerError,
+		LogMessage:     "error occurred while marshalling response body",
+		LogSeverity:    zap.ErrorLevel,
+	}
+
+	ErrorBuildExpression = &CustomError{
+		HttpStatusCode: http.StatusInternalServerError,
+		LogMessage:     "error occurred while build update expression",
+		LogSeverity:    zap.ErrorLevel,
+	}
+
+	ErrorUserNotFound = &CustomError{
+		HttpStatusCode: http.StatusNotFound,
+		LogMessage:     "user not found",
+		LogSeverity:    zap.ErrorLevel,
 	}
 )

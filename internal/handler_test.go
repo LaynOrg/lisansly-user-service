@@ -141,7 +141,7 @@ func TestHandler_CreateUser(t *testing.T) {
 				"Content-Type": "application/json",
 				"Accept":       "application/json",
 			},
-			Body:            "{}",
+			Body:            `{"key":"value"`,
 			IsBase64Encoded: false,
 		})
 
@@ -424,7 +424,7 @@ func TestHandler_Login(t *testing.T) {
 				"Content-Type": "application/json",
 				"Accept":       "application/json",
 			},
-			Body:            "{}",
+			Body:            `{"key":"value"`,
 			IsBase64Encoded: false,
 		})
 
@@ -668,7 +668,7 @@ func TestHandler_GetUserById(t *testing.T) {
 				"Content-Type": "application/json",
 				"Accept":       "application/json",
 			},
-			Body:            "{}",
+			Body:            `{"key":"value"`,
 			IsBase64Encoded: false,
 		})
 
@@ -898,7 +898,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				"Accept":       "application/json",
 				"Content-Type": "application/json",
 			},
-			Body:            "{}",
+			Body:            `{"key":"value"`,
 			IsBase64Encoded: false,
 		})
 
@@ -1156,7 +1156,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 				"Content-Type": "application/json",
 				"Accept":       "application/json",
 			},
-			Body:            "{}",
+			Body:            `{"key":"value"`,
 			IsBase64Encoded: false,
 		})
 

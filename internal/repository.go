@@ -204,14 +204,11 @@ func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Table,
 		WithKeyCondition(condition).
 		Build()
 	if err != nil {
-		return nil, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while build expression",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorBuildExpression
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return nil, cerr
 	}
 
 	var result *dynamodb.QueryOutput
@@ -234,11 +231,7 @@ func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Table,
 	}
 
 	if len(result.Items) == 0 {
-		return nil, &cerror.CustomError{
-			HttpStatusCode: http.StatusNotFound,
-			LogMessage:     "user not found",
-			LogSeverity:    zap.ErrorLevel,
-		}
+		return nil, cerror.ErrorUserNotFound
 	}
 
 	var user *Table
@@ -268,14 +261,11 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Tabl
 		WithFilter(condition).
 		Build()
 	if err != nil {
-		return nil, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while build expression",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorBuildExpression
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return nil, cerr
 	}
 
 	var result *dynamodb.ScanOutput
@@ -298,11 +288,9 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Tabl
 	}
 
 	if len(result.Items) == 0 {
-		return nil, &cerror.CustomError{
-			HttpStatusCode: http.StatusNotFound,
-			LogMessage:     "user not found",
-			LogSeverity:    zap.WarnLevel,
-		}
+		cerr := cerror.ErrorUserNotFound
+		cerr.LogSeverity = zap.WarnLevel
+		return nil, cerr
 	}
 
 	var user *Table
@@ -332,14 +320,11 @@ func (r *repository) FindRefreshTokenWithUserId(ctx context.Context, userId stri
 		WithFilter(condition).
 		Build()
 	if err != nil {
-		return nil, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while build expression",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorBuildExpression
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return nil, cerr
 	}
 
 	var result *dynamodb.ScanOutput
@@ -419,11 +404,7 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, updateUs
 		}
 
 		if result.Item == nil {
-			return &cerror.CustomError{
-				HttpStatusCode: http.StatusNotFound,
-				LogMessage:     "user not found",
-				LogSeverity:    zap.ErrorLevel,
-			}
+			return cerror.ErrorUserNotFound
 		}
 
 		var userInDatabase *Table
@@ -561,14 +542,11 @@ func (r *repository) buildUpdateExpression(updateUserPayload *UpdateUserPayload)
 		WithUpdate(updateBuilder).
 		Build()
 	if err != nil {
-		return expression.Expression{}, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while build update expression",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorBuildExpression
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return expression.Expression{}, cerr
 	}
 
 	return updateExpression, nil

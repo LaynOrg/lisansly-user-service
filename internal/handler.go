@@ -99,7 +99,6 @@ func (h *handler) CreateUser(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -109,7 +108,6 @@ func (h *handler) CreateUser(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -122,21 +120,18 @@ func (h *handler) CreateUser(
 	var responseBody []byte
 	responseBody, err = json.Marshal(&tokens)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while marshalling response body",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorJsonMarshalling
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
 	log.Info(logger.LoggerEventFinished)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusCreated,
 		Headers: map[string]string{
-			"Content-Type": "application/json",
+			HeaderContentType: MIMEApplicationJson,
 		},
 		Body: string(responseBody),
 	}, nil
@@ -167,7 +162,6 @@ func (h *handler) Login(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -177,7 +171,6 @@ func (h *handler) Login(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -190,21 +183,18 @@ func (h *handler) Login(
 	var responseBody []byte
 	responseBody, err = json.Marshal(&tokens)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while marshalling response body",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorJsonMarshalling
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
 	h.logger.Info(logger.LoggerEventFinished)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
 		Headers: map[string]string{
-			"Content-Type": "application/json",
+			HeaderContentType: MIMEApplicationJson,
 		},
 		Body: string(responseBody),
 	}, nil
@@ -234,7 +224,6 @@ func (h *handler) GetUserById(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -250,7 +239,6 @@ func (h *handler) GetUserById(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -263,21 +251,18 @@ func (h *handler) GetUserById(
 	var payload []byte
 	payload, err = json.Marshal(userDocument)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while marshalling error",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorJsonMarshalling
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
 	log.Info(logger.LoggerEventFinished)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
 		Headers: map[string]string{
-			"Content-Type": "application/json",
+			HeaderContentType: MIMEApplicationJson,
 		},
 		Body:            string(payload),
 		IsBase64Encoded: false,
@@ -310,7 +295,6 @@ func (h *handler) UpdateUserById(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -326,7 +310,6 @@ func (h *handler) UpdateUserById(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -339,21 +322,18 @@ func (h *handler) UpdateUserById(
 	var responseBody []byte
 	responseBody, err = json.Marshal(tokens)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while marshalling response body",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorJsonMarshalling
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
 	log.Info(logger.LoggerEventFinished)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
 		Headers: map[string]string{
-			"Content-Type": "application/json",
+			HeaderContentType: MIMEApplicationJson,
 		},
 		Body: string(responseBody),
 	}, nil
@@ -384,7 +364,6 @@ func (h *handler) GetAccessTokenViaRefreshToken(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -394,7 +373,6 @@ func (h *handler) GetAccessTokenViaRefreshToken(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
@@ -411,21 +389,18 @@ func (h *handler) GetAccessTokenViaRefreshToken(
 	var responseBody []byte
 	responseBody, err = json.Marshal(&accessToken)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while marshalling response body",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
+		cerr := cerror.ErrorJsonMarshalling
+		cerr.LogFields = []zap.Field{
+			zap.Error(err),
 		}
+		return events.APIGatewayProxyResponse{}, cerr
 	}
 
 	log.Info(logger.LoggerEventFinished)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
 		Headers: map[string]string{
-			"Content-Type": "application/json",
+			HeaderContentType: MIMEApplicationJson,
 		},
 		Body: string(responseBody),
 	}, nil

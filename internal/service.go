@@ -53,26 +53,14 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 		}
 	}
 
-	createdAt := time.Now().UTC()
-	if err != nil {
-		return nil, &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while time parsing",
-			LogSeverity:    zapcore.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
-		}
-	}
-
-	userId := uuid.New().String()
+	userId := uuid.NewString()
 	err = s.userRepository.InsertUser(context.Background(), &Table{
 		Id:        userId,
 		Name:      user.Name,
 		Email:     user.Email,
 		Password:  string(hashedPassword),
 		Role:      RoleUser,
-		CreatedAt: createdAt,
+		CreatedAt: time.Now().UTC(),
 	})
 	if err != nil {
 		return nil, err
@@ -102,8 +90,9 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 		return nil, cerr
 	}
 
+	refreshTokenId := uuid.NewString()
 	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
-		Id:        uuid.New().String(),
+		Id:        refreshTokenId,
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
 		UserID:    userId,
@@ -165,7 +154,6 @@ func (s *service) Login(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return nil, cerr
 	}
 
@@ -177,7 +165,6 @@ func (s *service) Login(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return nil, cerr
 	}
 
@@ -231,7 +218,6 @@ func (s *service) UpdateUserById(
 				},
 			}
 		}
-
 		updateUser.Password = string(hashedPassword)
 	}
 
@@ -253,7 +239,6 @@ func (s *service) UpdateUserById(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return nil, cerr
 	}
 
@@ -265,7 +250,6 @@ func (s *service) UpdateUserById(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return nil, cerr
 	}
 
@@ -332,7 +316,6 @@ func (s *service) GetAccessTokenByRefreshToken(
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
 		return nil, cerr
 	}
 
