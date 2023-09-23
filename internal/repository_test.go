@@ -5,6 +5,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"net/http"
 	"testing"
 	"time"
@@ -40,16 +41,9 @@ func TestRepository_InsertUser(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
 
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
 
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createUserTable(t, ctx, dynamodbClient)
 		createUserUniquenessTable(t, ctx, dynamodbClient)
 
@@ -74,17 +68,9 @@ func TestRepository_InsertUser(t *testing.T) {
 
 	t.Run("when user already exist in table should return error", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
 
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createUserTable(t, ctx, dynamodbClient)
 		createUserUniquenessTable(t, ctx, dynamodbClient)
 
@@ -147,17 +133,8 @@ func TestRepository_InsertUser(t *testing.T) {
 
 	t.Run("when error occurred insert user item to table should return error", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 
 		userRepository := NewRepository(
 			dynamodbClient,
@@ -186,17 +163,8 @@ func TestRepository_InsertUser(t *testing.T) {
 func TestRepository_FindUserWithId(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createUserTable(t, ctx, dynamodbClient)
 
 		now := time.Now().UTC()
@@ -270,17 +238,8 @@ func TestRepository_FindUserWithId(t *testing.T) {
 
 	t.Run("when user not found in table should return error", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createUserTable(t, ctx, dynamodbClient)
 
 		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
@@ -305,17 +264,8 @@ func TestRepository_FindUserWithId(t *testing.T) {
 func TestRepository_FindUserWithEmail(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createUserTable(t, ctx, dynamodbClient)
 
 		now := time.Now().UTC()
@@ -389,17 +339,8 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 
 	t.Run("when user not found should return error", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createUserTable(t, ctx, dynamodbClient)
 
 		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
@@ -424,17 +365,8 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
 		userRepository := NewRepository(
@@ -446,7 +378,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			},
 		)
 
-		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+		err := userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 			Id:        "abcd-abcd-abcd-abcd",
 			UserID:    "abcd-abcd-abcd-abcd",
 			Token:     "abcd.abcd.abcd",
@@ -490,17 +422,8 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
 		now := time.Now().UTC().Add(10 * time.Minute)
@@ -570,17 +493,8 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 
 	t.Run("when refresh token not found should return error", func(t *testing.T) {
 		ctx := context.Background()
-
-		container, uri := setupDynamoDbContainer(t, ctx)
+		container, dynamodbClient := createAwsClient(t, ctx)
 		defer container.Terminate(ctx)
-
-		cfg, err := awsCfg.LoadDefaultConfig(ctx)
-		require.NoError(t, err)
-
-		dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-			options.BaseEndpoint = uri
-			options.Region = TestAwsRegion
-		})
 		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
 		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
@@ -606,17 +520,8 @@ func TestRepository_UpdateUserById(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		t.Run("with email", func(t *testing.T) {
 			ctx := context.Background()
-
-			container, uri := setupDynamoDbContainer(t, ctx)
+			container, dynamodbClient := createAwsClient(t, ctx)
 			defer container.Terminate(ctx)
-
-			cfg, err := awsCfg.LoadDefaultConfig(ctx)
-			require.NoError(t, err)
-
-			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-				options.BaseEndpoint = uri
-				options.Region = TestAwsRegion
-			})
 			createUserTable(t, ctx, dynamodbClient)
 			createUserUniquenessTable(t, ctx, dynamodbClient)
 
@@ -676,17 +581,8 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		t.Run("without email", func(t *testing.T) {
 			ctx := context.Background()
-
-			container, uri := setupDynamoDbContainer(t, ctx)
+			container, dynamodbClient := createAwsClient(t, ctx)
 			defer container.Terminate(ctx)
-
-			cfg, err := awsCfg.LoadDefaultConfig(ctx)
-			require.NoError(t, err)
-
-			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-				options.BaseEndpoint = uri
-				options.Region = TestAwsRegion
-			})
 			createUserTable(t, ctx, dynamodbClient)
 			createUserUniquenessTable(t, ctx, dynamodbClient)
 
@@ -782,17 +678,8 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		t.Run("when user not found should return error", func(t *testing.T) {
 			ctx := context.Background()
-
-			container, uri := setupDynamoDbContainer(t, ctx)
+			container, dynamodbClient := createAwsClient(t, ctx)
 			defer container.Terminate(ctx)
-
-			cfg, err := awsCfg.LoadDefaultConfig(ctx)
-			require.NoError(t, err)
-
-			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-				options.BaseEndpoint = uri
-				options.Region = TestAwsRegion
-			})
 			createUserTable(t, ctx, dynamodbClient)
 
 			repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
@@ -821,17 +708,8 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		t.Run("when error occurred while update user should return error", func(t *testing.T) {
 			ctx := context.Background()
-
-			container, uri := setupDynamoDbContainer(t, ctx)
+			container, dynamodbClient := createAwsClient(t, ctx)
 			defer container.Terminate(ctx)
-
-			cfg, err := awsCfg.LoadDefaultConfig(ctx)
-			require.NoError(t, err)
-
-			dynamodbClient := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
-				options.BaseEndpoint = uri
-				options.Region = TestAwsRegion
-			})
 			createUserTable(t, ctx, dynamodbClient)
 
 			fakeUserItem, err := attributevalue.MarshalMap(&Table{
@@ -981,24 +859,49 @@ func createUserUniquenessTable(t *testing.T, ctx context.Context, dynamodbClient
 	require.NoError(t, err)
 }
 
-func setupDynamoDbContainer(t *testing.T, ctx context.Context) (testcontainers.Container, *string) {
-	req := testcontainers.ContainerRequest{
-		Image:        "amazon/dynamodb-local",
-		ExposedPorts: []string{"8000/tcp"},
-		WaitingFor:   wait.NewHostPortStrategy("8000"),
-	}
-
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+func createAwsClient(t *testing.T, ctx context.Context) (testcontainers.Container, *dynamodb.Client) {
+	container, err := testcontainers.GenericContainer(
+		ctx,
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Image:        "localstack/localstack",
+				ExposedPorts: []string{"4566/tcp"},
+				WaitingFor:   wait.NewHostPortStrategy("4566"),
+			},
+			Started: true,
+		},
+	)
 	require.NoError(t, err)
 
 	ip, err := container.Host(ctx)
 	require.NoError(t, err)
 
-	port, err := container.MappedPort(ctx, "8000")
+	port, err := container.MappedPort(ctx, "4566")
 	require.NoError(t, err)
 
-	return container, aws.String(fmt.Sprintf("http://%s:%s", ip, port))
+	cfg, err := awsCfg.LoadDefaultConfig(
+		ctx,
+		awsCfg.WithEndpointResolverWithOptions(
+			aws.EndpointResolverWithOptionsFunc(
+				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+					return aws.Endpoint{
+						SigningName:   "aws",
+						URL:           fmt.Sprintf("http://%s:%s", ip, port.Port()),
+						SigningRegion: TestAwsRegion,
+					}, nil
+				},
+			),
+		),
+		awsCfg.WithRegion(TestAwsRegion),
+		awsCfg.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
+				"AKID",
+				"SECRET_KEY",
+				"TOKEN",
+			),
+		),
+	)
+	require.NoError(t, err)
+
+	return container, dynamodb.NewFromConfig(cfg)
 }
