@@ -47,5 +47,6 @@ func ErrorHandler(ctx context.Context, err error) (events.APIGatewayProxyRespons
 	}
 	log.Log(cerr.LogSeverity, cerr.LogMessage)
 
-	return events.APIGatewayProxyResponse{}, cerr
+	serializedCerr := cerr.SerializeCerror()
+	return events.APIGatewayProxyResponse{}, serializedCerr
 }
