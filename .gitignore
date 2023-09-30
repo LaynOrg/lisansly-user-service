@@ -12,3 +12,5 @@ tmp/
 .yarn/
 env.*.json
 !env.example.json
+config.*.json
+!config.example.json
