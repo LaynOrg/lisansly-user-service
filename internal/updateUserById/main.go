@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	user "user-api/internal"
+	"user-api/pkg/cerror"
 	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
 )
@@ -58,9 +59,14 @@ func main() {
 	handler := user.NewHandler(
 		service,
 		nil,
-		log,
 		validator.New(),
 	)
 
-	lambda.Start(handler.UpdateUserById)
+	lambda.Start(
+		cerror.WithMiddleware(
+			log,
+			cerror.ErrorHandler,
+			handler.UpdateUserById,
+		),
+	)
 }

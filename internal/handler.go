@@ -56,20 +56,17 @@ type Handler interface {
 type handler struct {
 	service    Service
 	repository Repository
-	logger     *zap.SugaredLogger
 	validate   *validator.Validate
 }
 
 func NewHandler(
 	service Service,
 	repository Repository,
-	logger *zap.SugaredLogger,
 	validate *validator.Validate,
 ) Handler {
 	return &handler{
 		service:    service,
 		repository: repository,
-		logger:     logger,
 		validate:   validate,
 	}
 }
@@ -81,14 +78,12 @@ func (h *handler) CreateUser(
 	events.APIGatewayProxyResponse,
 	error,
 ) {
-	var (
-		err error
-		log = h.logger
-	)
+	var err error
 
+	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
-		log.With(zap.String("requestId", lc.AwsRequestID))
+		log = log.With(zap.String("requestId", lc.AwsRequestID))
 	}
 	ctx = logger.InjectContext(ctx, log)
 
@@ -144,14 +139,12 @@ func (h *handler) Login(
 	events.APIGatewayProxyResponse,
 	error,
 ) {
-	var (
-		err error
-		log = h.logger
-	)
+	var err error
 
+	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
-		log.With(zap.String("requestId", lc.AwsRequestID))
+		log = log.With(zap.String("requestId", lc.AwsRequestID))
 	}
 	ctx = logger.InjectContext(ctx, log)
 
@@ -190,7 +183,7 @@ func (h *handler) Login(
 		return events.APIGatewayProxyResponse{}, cerr
 	}
 
-	h.logger.Info(logger.LoggerEventFinished)
+	log.Info(logger.LoggerEventFinished)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
 		Headers: map[string]string{
@@ -207,11 +200,9 @@ func (h *handler) GetUserById(
 	events.APIGatewayProxyResponse,
 	error,
 ) {
-	var (
-		err error
-		log = h.logger
-	)
+	var err error
 
+	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
 		log = log.With(zap.String("requestId", lc.AwsRequestID))
@@ -228,9 +219,7 @@ func (h *handler) GetUserById(
 	}
 
 	userId := requestBody.UserId
-	log = log.With(
-		zap.String("userId", userId),
-	)
+	log = log.With(zap.String("userId", userId))
 	ctx = logger.InjectContext(ctx, log)
 
 	err = h.validate.Struct(requestBody)
@@ -276,17 +265,16 @@ func (h *handler) UpdateUserById(
 	events.APIGatewayProxyResponse,
 	error,
 ) {
-	var (
-		err error
-		log = h.logger
-	)
+	var err error
 
+	log := logger.FromContext(ctx)
 	lambdaContext, ok := lambdacontext.FromContext(ctx)
 	if ok {
 		log = log.With(
 			zap.String("requestId", lambdaContext.AwsRequestID),
 		)
 	}
+	ctx = logger.InjectContext(ctx, log)
 
 	var requestPayload *UpdateUserPayload
 	err = json.Unmarshal([]byte(request.Body), &requestPayload)
@@ -346,11 +334,9 @@ func (h *handler) GetAccessTokenViaRefreshToken(
 	events.APIGatewayProxyResponse,
 	error,
 ) {
-	var (
-		err error
-		log = h.logger
-	)
+	var err error
 
+	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
 		log = log.With(zap.String("requestId", lc.AwsRequestID))

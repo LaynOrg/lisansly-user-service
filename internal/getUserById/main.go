@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	user "user-api/internal"
+	"user-api/pkg/cerror"
 	"user-api/pkg/config"
 )
 
@@ -43,9 +44,14 @@ func main() {
 	handler := user.NewHandler(
 		nil,
 		repository,
-		log,
 		validator.New(),
 	)
 
-	lambda.Start(handler.GetUserById)
+	lambda.Start(
+		cerror.WithMiddleware(
+			log,
+			cerror.ErrorHandler,
+			handler.GetUserById,
+		),
+	)
 }

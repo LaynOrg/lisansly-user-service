@@ -35,17 +35,8 @@ func TestFromContext(t *testing.T) {
 		ctx := context.Background()
 		ctx = InjectContext(ctx, log)
 
-		logFromCtx, ok := FromContext(ctx)
+		logFromCtx := FromContext(ctx)
 
-		assert.True(t, ok)
 		assert.NotNil(t, logFromCtx)
-	})
-
-	t.Run("when logger value is empty in ctx should return false", func(t *testing.T) {
-		ctx := context.Background()
-		logFromCtx, ok := FromContext(ctx)
-
-		assert.False(t, ok)
-		assert.Nil(t, logFromCtx)
 	})
 }

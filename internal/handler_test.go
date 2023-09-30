@@ -21,7 +21,7 @@ import (
 )
 
 func TestNewHandler(t *testing.T) {
-	h := NewHandler(nil, nil, nil, nil)
+	h := NewHandler(nil, nil, nil)
 	assert.Implements(t, (*Handler)(nil), h)
 }
 
@@ -50,8 +50,7 @@ func TestHandler_CreateUser(t *testing.T) {
 				},
 				nil,
 			)
-		log, _ := zap.NewProduction()
-		h := NewHandler(mockUserService, nil, log.Sugar(), validator.New())
+		h := NewHandler(mockUserService, nil, validator.New())
 
 		reqBody, err := json.Marshal(&RegisterPayload{
 			Name:     "test",
@@ -97,8 +96,7 @@ func TestHandler_CreateUser(t *testing.T) {
 				},
 				nil,
 			)
-		log, _ := zap.NewProduction()
-		h := NewHandler(mockUserService, nil, log.Sugar(), validator.New())
+		h := NewHandler(mockUserService, nil, validator.New())
 
 		reqBody, err := json.Marshal(&RegisterPayload{
 			Name:     "test",
@@ -133,9 +131,7 @@ func TestHandler_CreateUser(t *testing.T) {
 			AwsRequestID: "abcd-abcd-abcd-abcd",
 		})
 
-		log, _ := zap.NewProduction()
-		h := NewHandler(nil, nil, log.Sugar(), validator.New())
-
+		h := NewHandler(nil, nil, validator.New())
 		response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
 			Headers: map[string]string{
 				"Content-Type": "application/json",
@@ -160,9 +156,7 @@ func TestHandler_CreateUser(t *testing.T) {
 				AwsRequestID: "abcd-abcd-abcd-abcd",
 			})
 
-			log, _ := zap.NewProduction()
-			h := NewHandler(nil, nil, log.Sugar(), validator.New())
-
+			h := NewHandler(nil, nil, validator.New())
 			reqBody, err := json.Marshal(&RegisterPayload{
 				Name:     "",
 				Email:    "test@test.com",
@@ -193,9 +187,7 @@ func TestHandler_CreateUser(t *testing.T) {
 				AwsRequestID: "abcd-abcd-abcd-abcd",
 			})
 
-			log, _ := zap.NewProduction()
-			h := NewHandler(nil, nil, log.Sugar(), validator.New())
-
+			h := NewHandler(nil, nil, validator.New())
 			reqBody, err := json.Marshal(&RegisterPayload{
 				Name:     "test",
 				Email:    "",
@@ -226,9 +218,7 @@ func TestHandler_CreateUser(t *testing.T) {
 				AwsRequestID: "abcd-abcd-abcd-abcd",
 			})
 
-			log, _ := zap.NewProduction()
-			h := NewHandler(nil, nil, log.Sugar(), validator.New())
-
+			h := NewHandler(nil, nil, validator.New())
 			reqBody, err := json.Marshal(&RegisterPayload{
 				Name:     "test",
 				Email:    "test@test.com",
@@ -272,9 +262,8 @@ func TestHandler_CreateUser(t *testing.T) {
 				nil,
 				errors.New("test error"),
 			)
-		log, _ := zap.NewProduction()
 
-		h := NewHandler(mockUserService, nil, log.Sugar(), validator.New())
+		h := NewHandler(mockUserService, nil, validator.New())
 
 		reqBody, err := json.Marshal(&RegisterPayload{
 			Name:     "test",
@@ -329,7 +318,7 @@ func TestHandler_Login(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(mockService, nil, log, validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&LoginPayload{
 			Email:    "test@test.com",
@@ -377,7 +366,7 @@ func TestHandler_Login(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(mockService, nil, log, validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&LoginPayload{
 			Email:    "test@test.com",
@@ -417,7 +406,7 @@ func TestHandler_Login(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(nil, nil, log, validator.New())
+		h := NewHandler(nil, nil, validator.New())
 
 		response, cerr := h.Login(ctx, events.APIGatewayProxyRequest{
 			Headers: map[string]string{
@@ -449,7 +438,7 @@ func TestHandler_Login(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, log, validator.New())
+			h := NewHandler(nil, nil, validator.New())
 
 			requestBody, err := json.Marshal(&LoginPayload{
 				Email:    "",
@@ -486,7 +475,7 @@ func TestHandler_Login(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, log, validator.New())
+			h := NewHandler(nil, nil, validator.New())
 
 			requestBody, err := json.Marshal(&LoginPayload{
 				Email:    "test@test.com",
@@ -533,7 +522,7 @@ func TestHandler_Login(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(mockService, nil, log, validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&LoginPayload{
 			Email:    "test@test.com",
@@ -587,7 +576,7 @@ func TestHandler_GetUserById(t *testing.T) {
 			FindUserWithId(gomock.Any(), "abcd-abcd-abcd-abcd").
 			Return(testUser, nil)
 
-		h := NewHandler(nil, mockRepository, log, validator.New())
+		h := NewHandler(nil, mockRepository, validator.New())
 
 		requestBody, err := json.Marshal(&GetUserByIdPayload{
 			UserId: "abcd-abcd-abcd-abcd",
@@ -625,7 +614,7 @@ func TestHandler_GetUserById(t *testing.T) {
 			FindUserWithId(gomock.Any(), "abcd-abcd-abcd-abcd").
 			Return(testUser, nil)
 
-		h := NewHandler(nil, mockRepository, log, validator.New())
+		h := NewHandler(nil, mockRepository, validator.New())
 
 		requestBody, err := json.Marshal(&GetUserByIdPayload{
 			UserId: "abcd-abcd-abcd-abcd",
@@ -661,7 +650,7 @@ func TestHandler_GetUserById(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(nil, nil, log, validator.New())
+		h := NewHandler(nil, nil, validator.New())
 
 		response, cerr := h.GetUserById(ctx, events.APIGatewayProxyRequest{
 			Headers: map[string]string{
@@ -692,7 +681,7 @@ func TestHandler_GetUserById(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(nil, nil, log, validator.New())
+		h := NewHandler(nil, nil, validator.New())
 
 		requestBody, err := json.Marshal(&GetUserByIdPayload{
 			UserId: "",
@@ -734,7 +723,7 @@ func TestHandler_GetUserById(t *testing.T) {
 			FindUserWithId(gomock.Any(), "abcd-abcd-abcd-abcd").
 			Return(nil, errors.New("test error"))
 
-		h := NewHandler(nil, mockRepository, log, validator.New())
+		h := NewHandler(nil, mockRepository, validator.New())
 
 		requestBody, err := json.Marshal(&GetUserByIdPayload{
 			UserId: "abcd-abcd-abcd-abcd",
@@ -791,7 +780,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				RefreshToken: "abcd.abcd.abcd",
 			}, nil)
 
-		h := NewHandler(mockService, nil, log, validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&UpdateUserPayload{
 			UserId:   userId,
@@ -849,7 +838,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				RefreshToken: "abcd.abcd.abcd",
 			}, nil)
 
-		h := NewHandler(mockService, nil, log, validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&UpdateUserPayload{
 			UserId:   userId,
@@ -891,7 +880,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(nil, nil, log, validator.New())
+		h := NewHandler(nil, nil, validator.New())
 
 		response, cerr := h.UpdateUserById(ctx, events.APIGatewayProxyRequest{
 			Headers: map[string]string{
@@ -923,7 +912,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, log, validator.New())
+			h := NewHandler(nil, nil, validator.New())
 
 			requestBody, err := json.Marshal(&UpdateUserPayload{
 				UserId:   "abcdabcd",
@@ -962,7 +951,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, log, validator.New())
+			h := NewHandler(nil, nil, validator.New())
 
 			requestBody, err := json.Marshal(&UpdateUserPayload{
 				UserId:   uuid.NewString(),
@@ -1018,7 +1007,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 			).
 			Return(nil, errors.New("test error"))
 
-		h := NewHandler(mockService, nil, log, validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&UpdateUserPayload{
 			UserId:   userId,
@@ -1071,7 +1060,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 
-		h := NewHandler(mockService, nil, logger.Sugar(), validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
 			UserId:       "abcd-abcd-abcd-abcd",
@@ -1116,7 +1105,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 
-		h := NewHandler(mockService, nil, logger.Sugar(), validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
 			UserId:       "abcd-abcd-abcd-abcd",
@@ -1149,7 +1138,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 
-		h := NewHandler(nil, nil, logger.Sugar(), validator.New())
+		h := NewHandler(nil, nil, validator.New())
 
 		response, cerr := h.GetAccessTokenViaRefreshToken(ctx, events.APIGatewayProxyRequest{
 			Headers: map[string]string{
@@ -1178,7 +1167,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 			logger, _ := zap.NewProduction()
 			defer logger.Sync()
 
-			h := NewHandler(nil, nil, logger.Sugar(), validator.New())
+			h := NewHandler(nil, nil, validator.New())
 
 			requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
 				UserId:       "",
@@ -1212,7 +1201,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 			logger, _ := zap.NewProduction()
 			defer logger.Sync()
 
-			h := NewHandler(nil, nil, logger.Sugar(), validator.New())
+			h := NewHandler(nil, nil, validator.New())
 
 			requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
 				UserId:       "",
@@ -1260,7 +1249,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 
-		h := NewHandler(mockService, nil, logger.Sugar(), validator.New())
+		h := NewHandler(mockService, nil, validator.New())
 
 		requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
 			UserId:       "abcd-abcd-abcd-abcd",

@@ -7,15 +7,20 @@ import (
 )
 
 func InjectContext(ctx context.Context, logger *zap.SugaredLogger) context.Context {
-	ctx = context.WithValue(ctx, ContextLoggerValue, logger)
-	return ctx
+	return context.WithValue(ctx, ContextLoggerValue, logger)
 }
 
-func FromContext(ctx context.Context) (*zap.SugaredLogger, bool) {
+func FromContext(ctx context.Context) *zap.SugaredLogger {
 	logger, ok := ctx.Value(ContextLoggerValue).(*zap.SugaredLogger)
 	if !ok {
-		return nil, false
+		log, err := zap.NewProduction()
+		if err != nil {
+			panic(err)
+		}
+		_ = log.Sync()
+
+		return log.Sugar()
 	}
 
-	return logger, true
+	return logger
 }

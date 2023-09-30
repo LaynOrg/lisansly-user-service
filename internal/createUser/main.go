@@ -59,12 +59,12 @@ func main() {
 	handler := user.NewHandler(
 		service,
 		nil,
-		log,
 		validator.New(),
 	)
 
 	lambda.Start(
 		cerror.WithMiddleware(
+			log,
 			cerror.ErrorHandler,
 			handler.CreateUser,
 		),
