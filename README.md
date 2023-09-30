@@ -9,14 +9,20 @@
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Lisansly_user-api&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=Lisansly_user-api)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=Lisansly_user-api&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=Lisansly_user-api)
 
-
 ### Running Locally
-Before run app you must set environment variables in .env file then you can running app just like this:
+
+Before invoking the function, you must set environment variables in the 'env.local.json' file.</br>
+Afterward, you can invoke the function.</br>
+Make sure to open Docker in the background.
 
 ```shell
-make run
+make build && make zip
+
+# then
+
+sls invoke local -f funcName
 # or
-make build
+serverless invoke local -f funcName
 ```
 
 ### Linting
@@ -44,3 +50,4 @@ Run:
 ```shell
 pre-commit run
 ```
+
