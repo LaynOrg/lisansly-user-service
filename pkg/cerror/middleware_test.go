@@ -44,8 +44,8 @@ func TestWithMiddleware(t *testing.T) {
 		ctx := context.Background()
 		response, err := out(ctx, events.APIGatewayProxyRequest{})
 
-		assert.Empty(t, response)
-		assert.Equal(t, errors.New("{\"httpStatus\":500}"), err)
+		assert.Equal(t, events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, response)
+		assert.NoError(t, err)
 	})
 
 	t.Run("when error is nil should skip request", func(t *testing.T) {
@@ -94,8 +94,8 @@ func TestErrorHandler(t *testing.T) {
 		}
 		response, err := ErrorHandler(ctx, testError)
 
-		assert.Empty(t, response)
-		assert.Equal(t, errors.New("{\"httpStatus\":500}"), err)
+		assert.Equal(t, events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, response)
+		assert.NoError(t, err)
 	})
 
 	t.Run("when error is not type of cerror should return error", func(t *testing.T) {
