@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
@@ -16,10 +15,24 @@ import (
 )
 
 type Service interface {
-	Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, error)
-	Login(ctx context.Context, user *LoginPayload) (*jwt_generator.Tokens, error)
-	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) (*jwt_generator.Tokens, error)
-	GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (*AccessTokenPayload, error)
+	Register(
+		ctx context.Context,
+		user *RegisterPayload,
+	) (*jwt_generator.Tokens, *cerror.CustomError)
+	Login(
+		ctx context.Context,
+		user *LoginPayload,
+	) (*jwt_generator.Tokens, *cerror.CustomError)
+	UpdateUserById(
+		ctx context.Context,
+		userId string,
+		user *UpdateUserPayload,
+	) (*jwt_generator.Tokens, *cerror.CustomError)
+	GetAccessTokenByRefreshToken(
+		ctx context.Context,
+		userId string,
+		refreshToken string,
+	) (*AccessTokenPayload, *cerror.CustomError)
 }
 
 type service struct {
@@ -37,7 +50,7 @@ func NewService(
 	}
 }
 
-func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, error) {
+func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, *cerror.CustomError) {
 	var err error
 
 	var hashedPassword []byte
@@ -54,7 +67,7 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	userId := uuid.NewString()
-	err = s.userRepository.InsertUser(context.Background(), &Table{
+	customError := s.userRepository.InsertUser(ctx, &Table{
 		Id:        userId,
 		Name:      user.Name,
 		Email:     user.Email,
@@ -62,43 +75,41 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 		Role:      RoleUser,
 		CreatedAt: time.Now().UTC(),
 	})
-	if err != nil {
-		return nil, err
+	if customError != nil {
+		return nil, customError
 	}
 
 	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, userId)
 	if err != nil {
-		cerr := cerror.ErrorGenerateAccessToken
-		cerr.LogFields = []zap.Field{
+		customError := cerror.ErrorGenerateAccessToken
+		customError.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
-		return nil, cerr
+		return nil, customError
 	}
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
 	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, userId)
 	if err != nil {
-		cerr := cerror.ErrorGenerateRefreshToken
-		cerr.LogFields = []zap.Field{
+		customError := cerror.ErrorGenerateRefreshToken
+		customError.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-
-		return nil, cerr
+		return nil, customError
 	}
 
 	refreshTokenId := uuid.NewString()
-	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+	customError = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 		Id:        refreshTokenId,
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
 		UserID:    userId,
 	})
-	if err != nil {
-		return nil, err
+	if customError != nil {
+		return nil, customError
 	}
 
 	return &jwt_generator.Tokens{
@@ -112,32 +123,22 @@ func (s *service) Login(
 	claimedUser *LoginPayload,
 ) (
 	*jwt_generator.Tokens,
-	error,
+	*cerror.CustomError,
 ) {
-	var (
-		user *Table
-		err  error
-	)
-
-	user, err = s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
-	if err != nil {
-		var customError *cerror.CustomError
-		ok := errors.As(err, &customError)
-		if ok {
-			statusCode := customError.HttpStatusCode
-			if statusCode == http.StatusNotFound {
-				return nil, &cerror.CustomError{
-					HttpStatusCode: http.StatusUnauthorized,
-					LogMessage:     "user credentials invalid",
-					LogSeverity:    zapcore.WarnLevel,
-				}
+	user, customError := s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
+	if customError != nil {
+		statusCode := customError.HttpStatusCode
+		if statusCode == http.StatusNotFound {
+			return nil, &cerror.CustomError{
+				HttpStatusCode: http.StatusUnauthorized,
+				LogMessage:     "user credentials invalid",
+				LogSeverity:    zapcore.WarnLevel,
 			}
 		}
-
-		return nil, err
+		return nil, customError
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(claimedUser.Password))
+	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(claimedUser.Password))
 	if err != nil {
 		return nil, &cerror.CustomError{
 			HttpStatusCode: http.StatusUnauthorized,
@@ -150,32 +151,32 @@ func (s *service) Login(
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
-		cerr := cerror.ErrorGenerateAccessToken
-		cerr.LogFields = []zap.Field{
+		customError = cerror.ErrorGenerateAccessToken
+		customError.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return nil, cerr
+		return nil, customError
 	}
 
 	var refreshToken string
 	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
 	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, user.Id)
 	if err != nil {
-		cerr := cerror.ErrorGenerateRefreshToken
-		cerr.LogFields = []zap.Field{
+		customError = cerror.ErrorGenerateRefreshToken
+		customError.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return nil, cerr
+		return nil, customError
 	}
 
-	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+	customError = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 		Id:        uuid.New().String(),
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
 		UserID:    user.Id,
 	})
-	if err != nil {
-		return nil, err
+	if customError != nil {
+		return nil, customError
 	}
 
 	return &jwt_generator.Tokens{
@@ -188,13 +189,10 @@ func (s *service) UpdateUserById(
 	ctx context.Context,
 	userId string,
 	updateUser *UpdateUserPayload,
-) (*jwt_generator.Tokens, error) {
-	var err error
-
-	var user *Table
-	user, err = s.userRepository.FindUserWithId(ctx, userId)
-	if err != nil {
-		return nil, err
+) (*jwt_generator.Tokens, *cerror.CustomError) {
+	user, customError := s.userRepository.FindUserWithId(ctx, userId)
+	if customError != nil {
+		return nil, customError
 	}
 
 	if user.Email == updateUser.Email {
@@ -206,8 +204,7 @@ func (s *service) UpdateUserById(
 	}
 
 	if updateUser.Password != "" {
-		var hashedPassword []byte
-		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(updateUser.Password), bcrypt.DefaultCost)
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updateUser.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, &cerror.CustomError{
 				HttpStatusCode: http.StatusInternalServerError,
@@ -221,25 +218,24 @@ func (s *service) UpdateUserById(
 		updateUser.Password = string(hashedPassword)
 	}
 
-	err = s.userRepository.UpdateUserById(ctx, userId, updateUser)
-	if err != nil {
-		return nil, err
+	customError = s.userRepository.UpdateUserById(ctx, userId, updateUser)
+	if customError != nil {
+		return nil, customError
 	}
 
-	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateAccessToken(
+	accessToken, err := s.jwtGenerator.GenerateAccessToken(
 		accessTokenExpiresAt,
 		user.Name,
 		user.Email,
 		userId,
 	)
 	if err != nil {
-		cerr := cerror.ErrorGenerateAccessToken
-		cerr.LogFields = []zap.Field{
+		customError = cerror.ErrorGenerateAccessToken
+		customError.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return nil, cerr
+		return nil, customError
 	}
 
 	var refreshToken string
@@ -253,14 +249,14 @@ func (s *service) UpdateUserById(
 		return nil, cerr
 	}
 
-	err = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+	customError = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 		Id:        uuid.New().String(),
 		UserID:    userId,
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
 	})
-	if err != nil {
-		return nil, err
+	if customError != nil {
+		return nil, customError
 	}
 
 	return &jwt_generator.Tokens{
@@ -275,14 +271,11 @@ func (s *service) GetAccessTokenByRefreshToken(
 	refreshToken string,
 ) (
 	*AccessTokenPayload,
-	error,
+	*cerror.CustomError,
 ) {
-	var err error
-
-	var refreshTokenDocument *RefreshTokenHistoryTable
-	refreshTokenDocument, err = s.userRepository.FindRefreshTokenWithUserId(ctx, userId)
-	if err != nil {
-		return nil, err
+	refreshTokenDocument, customError := s.userRepository.FindRefreshTokenWithUserId(ctx, userId)
+	if customError != nil {
+		return nil, customError
 	}
 
 	if refreshTokenDocument.Token != refreshToken {
@@ -303,14 +296,13 @@ func (s *service) GetAccessTokenByRefreshToken(
 	}
 
 	var user *Table
-	user, err = s.userRepository.FindUserWithId(ctx, userId)
-	if err != nil {
-		return nil, err
+	user, customError = s.userRepository.FindUserWithId(ctx, userId)
+	if customError != nil {
+		return nil, customError
 	}
 
-	var accessToken string
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
+	accessToken, err := s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
 	if err != nil {
 		cerr := cerror.ErrorGenerateAccessToken
 		cerr.LogFields = []zap.Field{

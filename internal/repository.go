@@ -18,12 +18,12 @@ import (
 )
 
 type Repository interface {
-	InsertUser(ctx context.Context, user *Table) error
-	FindUserWithId(ctx context.Context, userId string) (*Table, error)
-	FindUserWithEmail(ctx context.Context, email string) (*Table, error)
-	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) error
-	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, error)
-	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) error
+	InsertUser(ctx context.Context, user *Table) *cerror.CustomError
+	FindUserWithId(ctx context.Context, userId string) (*Table, *cerror.CustomError)
+	FindUserWithEmail(ctx context.Context, email string) (*Table, *cerror.CustomError)
+	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) *cerror.CustomError
+	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, *cerror.CustomError)
+	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) *cerror.CustomError
 }
 
 type repository struct {
@@ -41,7 +41,7 @@ func NewRepository(
 	}
 }
 
-func (r *repository) InsertUser(ctx context.Context, user *Table) error {
+func (r *repository) InsertUser(ctx context.Context, user *Table) *cerror.CustomError {
 	var err error
 
 	var userItem map[string]types.AttributeValue
@@ -158,7 +158,7 @@ func (r *repository) InsertUser(ctx context.Context, user *Table) error {
 func (r *repository) InsertRefreshTokenHistory(
 	ctx context.Context,
 	refreshTokenHistory *RefreshTokenHistoryTable,
-) error {
+) *cerror.CustomError {
 	var err error
 
 	var refreshTokenHistoryItem map[string]types.AttributeValue
@@ -193,7 +193,7 @@ func (r *repository) InsertRefreshTokenHistory(
 	return nil
 }
 
-func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Table, error) {
+func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Table, *cerror.CustomError) {
 	var err error
 
 	condition := expression.Key("id").Equal(expression.Value(userId))
@@ -250,7 +250,7 @@ func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Table,
 	return user, nil
 }
 
-func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Table, error) {
+func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Table, *cerror.CustomError) {
 	var err error
 
 	condition := expression.Name("email").Equal(expression.Value(email))
@@ -309,7 +309,9 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Tabl
 	return user, nil
 }
 
-func (r *repository) FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, error) {
+func (r *repository) FindRefreshTokenWithUserId(
+	ctx context.Context, userId string,
+) (*RefreshTokenHistoryTable, *cerror.CustomError) {
 	var err error
 
 	condition := expression.Name("userId").Equal(expression.Value(userId))
@@ -370,7 +372,9 @@ func (r *repository) FindRefreshTokenWithUserId(ctx context.Context, userId stri
 	return refreshToken, nil
 }
 
-func (r *repository) UpdateUserById(ctx context.Context, userId string, updateUserPayload *UpdateUserPayload) error {
+func (r *repository) UpdateUserById(
+	ctx context.Context, userId string, updateUserPayload *UpdateUserPayload,
+) *cerror.CustomError {
 	var (
 		err                 error
 		userTable           = aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable])
@@ -380,10 +384,9 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, updateUs
 		}
 	)
 
-	var updateExpression expression.Expression
-	updateExpression, err = r.buildUpdateExpression(updateUserPayload)
+	updateExpression, cerr := r.buildUpdateExpression(updateUserPayload)
 	if err != nil {
-		return err
+		return cerr
 	}
 
 	if updateUserPayload.Email != "" {
@@ -509,7 +512,9 @@ func (r *repository) UpdateUserById(ctx context.Context, userId string, updateUs
 	return nil
 }
 
-func (r *repository) buildUpdateExpression(updateUserPayload *UpdateUserPayload) (expression.Expression, error) {
+func (r *repository) buildUpdateExpression(
+	updateUserPayload *UpdateUserPayload,
+) (expression.Expression, *cerror.CustomError) {
 	var (
 		err           error
 		updateBuilder expression.UpdateBuilder

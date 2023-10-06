@@ -20,7 +20,6 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"user-api/pkg/cerror"
 	"user-api/pkg/config"
 )
 
@@ -63,7 +62,7 @@ func TestRepository_InsertUser(t *testing.T) {
 			Password: TestPassword,
 		})
 
-		assert.NoError(t, cerr)
+		assert.Nil(t, cerr)
 	})
 
 	t.Run("when user already exist in table should return error", func(t *testing.T) {
@@ -127,7 +126,7 @@ func TestRepository_InsertUser(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusConflict,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 
@@ -155,7 +154,7 @@ func TestRepository_InsertUser(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 }
@@ -204,7 +203,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 			Role:      RoleUser,
 			CreatedAt: now,
 		}, user)
-		assert.NoError(t, err)
+		assert.Nil(t, err)
 	})
 
 	t.Run("when error occurred while find user should return error", func(t *testing.T) {
@@ -231,7 +230,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, user)
 	})
@@ -255,7 +254,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusNotFound,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, user)
 	})
@@ -305,7 +304,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			Role:      RoleUser,
 			CreatedAt: now,
 		}, user)
-		assert.NoError(t, err)
+		assert.Nil(t, err)
 	})
 
 	t.Run("when error occurred while find user should return error", func(t *testing.T) {
@@ -332,7 +331,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, user)
 	})
@@ -356,7 +355,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusNotFound,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, user)
 	})
@@ -385,7 +384,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			ExpiresAt: time.Now().UTC(),
 		})
 
-		assert.NoError(t, err)
+		assert.Nil(t, err)
 	})
 
 	t.Run("when error occurred while insert user item should return error", func(t *testing.T) {
@@ -459,7 +458,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			Token:     TestAccessToken,
 			ExpiresAt: now,
 		}, user)
-		assert.NoError(t, cerr)
+		assert.Nil(t, cerr)
 	})
 
 	t.Run("when error occurred while find user should return error", func(t *testing.T) {
@@ -486,7 +485,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, user)
 	})
@@ -510,7 +509,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			http.StatusNotFound,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, user)
 	})
@@ -576,7 +575,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 				},
 			)
 
-			assert.NoError(t, cerr)
+			assert.Nil(t, cerr)
 		})
 
 		t.Run("without email", func(t *testing.T) {
@@ -636,7 +635,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 				},
 			)
 
-			assert.NoError(t, cerr)
+			assert.Nil(t, cerr)
 		})
 	})
 
@@ -672,7 +671,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				http.StatusInternalServerError,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				cerr.HttpStatusCode,
 			)
 		})
 
@@ -702,7 +701,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				http.StatusNotFound,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				cerr.HttpStatusCode,
 			)
 		})
 
@@ -748,7 +747,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				http.StatusInternalServerError,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				cerr.HttpStatusCode,
 			)
 		})
 	})
@@ -784,7 +783,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				http.StatusInternalServerError,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				cerr.HttpStatusCode,
 			)
 		})
 	})

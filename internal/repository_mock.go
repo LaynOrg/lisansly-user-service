@@ -7,6 +7,7 @@ package user
 import (
 	context "context"
 	reflect "reflect"
+	cerror "user-api/pkg/cerror"
 
 	gomock "go.uber.org/mock/gomock"
 )
@@ -35,11 +36,11 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 }
 
 // FindRefreshTokenWithUserId mocks base method.
-func (m *MockRepository) FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, error) {
+func (m *MockRepository) FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, *cerror.CustomError) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindRefreshTokenWithUserId", ctx, userId)
 	ret0, _ := ret[0].(*RefreshTokenHistoryTable)
-	ret1, _ := ret[1].(error)
+	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 
@@ -50,11 +51,11 @@ func (mr *MockRepositoryMockRecorder) FindRefreshTokenWithUserId(ctx, userId int
 }
 
 // FindUserWithEmail mocks base method.
-func (m *MockRepository) FindUserWithEmail(ctx context.Context, email string) (*Table, error) {
+func (m *MockRepository) FindUserWithEmail(ctx context.Context, email string) (*Table, *cerror.CustomError) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindUserWithEmail", ctx, email)
 	ret0, _ := ret[0].(*Table)
-	ret1, _ := ret[1].(error)
+	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 
@@ -65,11 +66,11 @@ func (mr *MockRepositoryMockRecorder) FindUserWithEmail(ctx, email interface{}) 
 }
 
 // FindUserWithId mocks base method.
-func (m *MockRepository) FindUserWithId(ctx context.Context, userId string) (*Table, error) {
+func (m *MockRepository) FindUserWithId(ctx context.Context, userId string) (*Table, *cerror.CustomError) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindUserWithId", ctx, userId)
 	ret0, _ := ret[0].(*Table)
-	ret1, _ := ret[1].(error)
+	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 
@@ -80,10 +81,10 @@ func (mr *MockRepositoryMockRecorder) FindUserWithId(ctx, userId interface{}) *g
 }
 
 // InsertRefreshTokenHistory mocks base method.
-func (m *MockRepository) InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) error {
+func (m *MockRepository) InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) *cerror.CustomError {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertRefreshTokenHistory", ctx, refreshTokenHistory)
-	ret0, _ := ret[0].(error)
+	ret0, _ := ret[0].(*cerror.CustomError)
 	return ret0
 }
 
@@ -94,10 +95,10 @@ func (mr *MockRepositoryMockRecorder) InsertRefreshTokenHistory(ctx, refreshToke
 }
 
 // InsertUser mocks base method.
-func (m *MockRepository) InsertUser(ctx context.Context, user *Table) error {
+func (m *MockRepository) InsertUser(ctx context.Context, user *Table) *cerror.CustomError {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertUser", ctx, user)
-	ret0, _ := ret[0].(error)
+	ret0, _ := ret[0].(*cerror.CustomError)
 	return ret0
 }
 
@@ -108,10 +109,10 @@ func (mr *MockRepositoryMockRecorder) InsertUser(ctx, user interface{}) *gomock.
 }
 
 // UpdateUserById mocks base method.
-func (m *MockRepository) UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) error {
+func (m *MockRepository) UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) *cerror.CustomError {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateUserById", ctx, userId, user)
-	ret0, _ := ret[0].(error)
+	ret0, _ := ret[0].(*cerror.CustomError)
 	return ret0
 }
 

@@ -15,10 +15,10 @@ package:
   individually: true
 
 functions:
-  createUser:
+  register:
     handler: bootstrap
     package:
-      artifact: build/createUser/createUser.zip
+      artifact: build/register/register.zip
 
   login:
     handler: bootstrap

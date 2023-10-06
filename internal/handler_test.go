@@ -2,14 +2,13 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
-	"github.com/go-playground/validator/v10"
-	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,11 +20,11 @@ import (
 )
 
 func TestNewHandler(t *testing.T) {
-	h := NewHandler(nil, nil, nil)
+	h := NewHandler(nil, nil)
 	assert.Implements(t, (*Handler)(nil), h)
 }
 
-func TestHandler_CreateUser(t *testing.T) {
+func TestHandler_Register(t *testing.T) {
 	mockController := gomock.NewController(t)
 	defer mockController.Finish()
 
@@ -50,27 +49,13 @@ func TestHandler_CreateUser(t *testing.T) {
 				},
 				nil,
 			)
-		h := NewHandler(mockUserService, nil, validator.New())
+		h := NewHandler(mockUserService, nil)
 
-		reqBody, err := json.Marshal(&RegisterPayload{
+		tokens, cerr := h.Register(ctx, &RegisterPayload{
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(reqBody),
-			IsBase64Encoded: false,
-		})
-
-		var tokens *jwt_generator.Tokens
-		err = json.Unmarshal([]byte(response.Body), &tokens)
-		require.NoError(t, err)
 
 		assert.Equal(t, &jwt_generator.Tokens{
 			AccessToken:  "abcd.abcd.abcd",
@@ -96,57 +81,19 @@ func TestHandler_CreateUser(t *testing.T) {
 				},
 				nil,
 			)
-		h := NewHandler(mockUserService, nil, validator.New())
+		h := NewHandler(mockUserService, nil)
 
-		reqBody, err := json.Marshal(&RegisterPayload{
+		tokens, cerr := h.Register(ctx, &RegisterPayload{
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(reqBody),
-			IsBase64Encoded: false,
-		})
-
-		var tokens *jwt_generator.Tokens
-		err = json.Unmarshal([]byte(response.Body), &tokens)
-		require.NoError(t, err)
 
 		assert.Equal(t, &jwt_generator.Tokens{
 			AccessToken:  "abcd.abcd.abcd",
 			RefreshToken: "abcd.abcd.abcd",
 		}, tokens)
 		assert.NoError(t, cerr)
-	})
-
-	t.Run("when get ambiguous request body should return error", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = lambdacontext.NewContext(ctx, &lambdacontext.LambdaContext{
-			AwsRequestID: "abcd-abcd-abcd-abcd",
-		})
-
-		h := NewHandler(nil, nil, validator.New())
-		response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            `{"key":"value"`,
-			IsBase64Encoded: false,
-		})
-
-		assert.Error(t, cerr)
-		assert.Equal(t,
-			cerror.ErrorBadRequest.HttpStatusCode,
-			cerr.(*cerror.CustomError).HttpStatusCode,
-		)
-		assert.Empty(t, response)
 	})
 
 	t.Run("validation error", func(t *testing.T) {
@@ -156,27 +103,22 @@ func TestHandler_CreateUser(t *testing.T) {
 				AwsRequestID: "abcd-abcd-abcd-abcd",
 			})
 
-			h := NewHandler(nil, nil, validator.New())
-			reqBody, err := json.Marshal(&RegisterPayload{
+			h := NewHandler(nil, nil)
+
+			response, cerr := h.Register(ctx, &RegisterPayload{
 				Name:     "",
 				Email:    "test@test.com",
 				Password: "Asdfg12345_",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-					"Accept":       "application/json",
-				},
-				Body:            string(reqBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerr *cerror.CustomError
+			err := json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerr)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerr.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -187,27 +129,22 @@ func TestHandler_CreateUser(t *testing.T) {
 				AwsRequestID: "abcd-abcd-abcd-abcd",
 			})
 
-			h := NewHandler(nil, nil, validator.New())
-			reqBody, err := json.Marshal(&RegisterPayload{
+			h := NewHandler(nil, nil)
+
+			response, cerr := h.Register(ctx, &RegisterPayload{
 				Name:     "test",
 				Email:    "",
 				Password: "Asdfg12345_",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-					"Accept":       "application/json",
-				},
-				Body:            string(reqBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerr *cerror.CustomError
+			err := json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerr)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerr.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -218,27 +155,22 @@ func TestHandler_CreateUser(t *testing.T) {
 				AwsRequestID: "abcd-abcd-abcd-abcd",
 			})
 
-			h := NewHandler(nil, nil, validator.New())
-			reqBody, err := json.Marshal(&RegisterPayload{
+			h := NewHandler(nil, nil)
+
+			response, cerr := h.Register(ctx, &RegisterPayload{
 				Name:     "test",
 				Email:    "test@test.com",
 				Password: "123",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-					"Accept":       "application/json",
-				},
-				Body:            string(reqBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerr *cerror.CustomError
+			err := json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerr)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerr.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -260,30 +192,22 @@ func TestHandler_CreateUser(t *testing.T) {
 			}).
 			Return(
 				nil,
-				errors.New("test error"),
+				&cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
 			)
 
-		h := NewHandler(mockUserService, nil, validator.New())
+		h := NewHandler(mockUserService, nil)
 
-		reqBody, err := json.Marshal(&RegisterPayload{
+		response, cerr := h.Register(ctx, &RegisterPayload{
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.CreateUser(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(reqBody),
-			IsBase64Encoded: false,
-		})
 
 		assert.Error(t, cerr)
 		assert.Equal(t,
-			errors.New("test error"),
+			errors.New(`{"httpStatus":500}`),
 			cerr,
 		)
 		assert.Empty(t, response)
@@ -318,26 +242,12 @@ func TestHandler_Login(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&LoginPayload{
+		tokens, cerr := h.Login(ctx, &LoginPayload{
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.Login(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var tokens *jwt_generator.Tokens
-		err = json.Unmarshal([]byte(response.Body), &tokens)
-		require.NoError(t, err)
 
 		assert.Equal(t, &jwt_generator.Tokens{
 			AccessToken:  "abcd.abcd.abcd",
@@ -366,63 +276,18 @@ func TestHandler_Login(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&LoginPayload{
+		tokens, cerr := h.Login(ctx, &LoginPayload{
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.Login(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var tokens *jwt_generator.Tokens
-		err = json.Unmarshal([]byte(response.Body), &tokens)
-		require.NoError(t, err)
 
 		assert.Equal(t, &jwt_generator.Tokens{
 			AccessToken:  "abcd.abcd.abcd",
 			RefreshToken: "abcd.abcd.abcd",
 		}, tokens)
 		assert.NoError(t, cerr)
-	})
-
-	t.Run("when request body is ambiguous should return error", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = lambdacontext.NewContext(ctx, &lambdacontext.LambdaContext{
-			AwsRequestID: "abcd.abcd.abcd.abcd",
-		})
-
-		logProd, err := zap.NewProduction()
-		require.NoError(t, err)
-
-		log := logProd.Sugar()
-		defer log.Sync()
-
-		h := NewHandler(nil, nil, validator.New())
-
-		response, cerr := h.Login(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            `{"key":"value"`,
-			IsBase64Encoded: false,
-		})
-
-		assert.Error(t, cerr)
-		assert.Equal(t,
-			cerror.ErrorBadRequest.HttpStatusCode,
-			cerr.(*cerror.CustomError).HttpStatusCode,
-		)
-		assert.Empty(t, response)
 	})
 
 	t.Run("validation error", func(t *testing.T) {
@@ -438,27 +303,21 @@ func TestHandler_Login(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, validator.New())
+			h := NewHandler(nil, nil)
 
-			requestBody, err := json.Marshal(&LoginPayload{
+			response, cerr := h.Login(ctx, &LoginPayload{
 				Email:    "",
 				Password: "Asdfg12345_",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.Login(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-					"Accept":       "application/json",
-				},
-				Body:            string(requestBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerror *cerror.CustomError
+			err = json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerror)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerror.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -475,27 +334,21 @@ func TestHandler_Login(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, validator.New())
+			h := NewHandler(nil, nil)
 
-			requestBody, err := json.Marshal(&LoginPayload{
+			response, cerr := h.Login(ctx, &LoginPayload{
 				Email:    "test@test.com",
 				Password: "123",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.Login(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-					"Accept":       "application/json",
-				},
-				Body:            string(requestBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerror *cerror.CustomError
+			err = json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerror)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerror.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -514,7 +367,12 @@ func TestHandler_Login(t *testing.T) {
 				Email:    "test@test.com",
 				Password: "Asdfg12345_",
 			}).
-			Return(nil, errors.New("test error"))
+			Return(
+				nil,
+				&cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
+			)
 
 		logProd, err := zap.NewProduction()
 		require.NoError(t, err)
@@ -522,26 +380,19 @@ func TestHandler_Login(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&LoginPayload{
+		response, cerr := h.Login(ctx, &LoginPayload{
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
-		})
-		require.NoError(t, err)
-
-		response, cerr := h.Login(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
 		})
 
 		assert.Empty(t, response)
 		assert.Error(t, cerr)
-		assert.Equal(t, errors.New("test error"), cerr)
+		assert.Equal(t,
+			errors.New(`{"httpStatus":500}`),
+			cerr,
+		)
 	})
 }
 
@@ -576,25 +427,11 @@ func TestHandler_GetUserById(t *testing.T) {
 			FindUserWithId(gomock.Any(), "abcd-abcd-abcd-abcd").
 			Return(testUser, nil)
 
-		h := NewHandler(nil, mockRepository, validator.New())
+		h := NewHandler(nil, mockRepository)
 
-		requestBody, err := json.Marshal(&GetUserByIdPayload{
+		user, err := h.GetUserById(ctx, &GetUserByIdPayload{
 			UserId: "abcd-abcd-abcd-abcd",
 		})
-		require.NoError(t, err)
-
-		response, err := h.GetUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var user *Table
-		err = json.Unmarshal([]byte(response.Body), &user)
-		require.NoError(t, err)
 
 		assert.Equal(t, testUser, user)
 		assert.NoError(t, err)
@@ -614,59 +451,14 @@ func TestHandler_GetUserById(t *testing.T) {
 			FindUserWithId(gomock.Any(), "abcd-abcd-abcd-abcd").
 			Return(testUser, nil)
 
-		h := NewHandler(nil, mockRepository, validator.New())
+		h := NewHandler(nil, mockRepository)
 
-		requestBody, err := json.Marshal(&GetUserByIdPayload{
+		user, err := h.GetUserById(ctx, &GetUserByIdPayload{
 			UserId: "abcd-abcd-abcd-abcd",
 		})
-		require.NoError(t, err)
-
-		response, err := h.GetUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var user *Table
-		err = json.Unmarshal([]byte(response.Body), &user)
-		require.NoError(t, err)
 
 		assert.Equal(t, testUser, user)
 		assert.NoError(t, err)
-	})
-
-	t.Run("when request body is ambiguous should return error", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = lambdacontext.NewContext(ctx, &lambdacontext.LambdaContext{
-			AwsRequestID: "abcd-abcd-abcd-abcd",
-		})
-
-		logProd, err := zap.NewProduction()
-		require.NoError(t, err)
-
-		log := logProd.Sugar()
-		defer log.Sync()
-
-		h := NewHandler(nil, nil, validator.New())
-
-		response, cerr := h.GetUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            `{"key":"value"`,
-			IsBase64Encoded: false,
-		})
-
-		assert.Error(t, cerr)
-		assert.Equal(t,
-			cerror.ErrorBadRequest.HttpStatusCode,
-			cerr.(*cerror.CustomError).HttpStatusCode,
-		)
-		assert.Empty(t, response)
 	})
 
 	t.Run("validation error", func(t *testing.T) {
@@ -681,26 +473,20 @@ func TestHandler_GetUserById(t *testing.T) {
 		log := logProd.Sugar()
 		defer log.Sync()
 
-		h := NewHandler(nil, nil, validator.New())
+		h := NewHandler(nil, nil)
 
-		requestBody, err := json.Marshal(&GetUserByIdPayload{
+		response, cerr := h.GetUserById(ctx, &GetUserByIdPayload{
 			UserId: "",
 		})
-		require.NoError(t, err)
 
-		response, cerr := h.GetUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
+		var unmarshalledCerror *cerror.CustomError
+		err = json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerror)
+		require.NoError(t, err)
 
 		assert.Error(t, cerr)
 		assert.Equal(t,
 			cerror.ErrorBadRequest.HttpStatusCode,
-			cerr.(*cerror.CustomError).HttpStatusCode,
+			unmarshalledCerror.HttpStatusCode,
 		)
 		assert.Empty(t, response)
 	})
@@ -721,26 +507,23 @@ func TestHandler_GetUserById(t *testing.T) {
 		mockRepository.
 			EXPECT().
 			FindUserWithId(gomock.Any(), "abcd-abcd-abcd-abcd").
-			Return(nil, errors.New("test error"))
+			Return(
+				nil, &cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
+			)
 
-		h := NewHandler(nil, mockRepository, validator.New())
+		h := NewHandler(nil, mockRepository)
 
-		requestBody, err := json.Marshal(&GetUserByIdPayload{
+		response, cerr := h.GetUserById(ctx, &GetUserByIdPayload{
 			UserId: "abcd-abcd-abcd-abcd",
-		})
-		require.NoError(t, err)
-
-		response, cerr := h.GetUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
 		})
 
 		assert.Error(t, cerr)
-		assert.Equal(t, errors.New("test error"), cerr)
+		assert.Equal(t,
+			errors.New(`{"httpStatus":500}`),
+			cerr,
+		)
 		assert.Empty(t, response)
 	})
 }
@@ -780,28 +563,14 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				RefreshToken: "abcd.abcd.abcd",
 			}, nil)
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&UpdateUserPayload{
+		tokens, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
 			UserId:   userId,
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.UpdateUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Accept":       "application/json",
-				"Content-Type": "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var tokens *jwt_generator.Tokens
-		err = json.Unmarshal([]byte(response.Body), &tokens)
-		require.NoError(t, err)
 
 		assert.NoError(t, cerr)
 		assert.Equal(t, &jwt_generator.Tokens{
@@ -838,65 +607,20 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				RefreshToken: "abcd.abcd.abcd",
 			}, nil)
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&UpdateUserPayload{
+		tokens, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
 			UserId:   userId,
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.UpdateUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Accept":       "application/json",
-				"Content-Type": "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var tokens *jwt_generator.Tokens
-		err = json.Unmarshal([]byte(response.Body), &tokens)
-		require.NoError(t, err)
 
 		assert.NoError(t, cerr)
 		assert.Equal(t, &jwt_generator.Tokens{
 			AccessToken:  "abcd.abcd.abcd",
 			RefreshToken: "abcd.abcd.abcd",
 		}, tokens)
-	})
-
-	t.Run("when request body is ambiguous should return error", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = lambdacontext.NewContext(ctx, &lambdacontext.LambdaContext{
-			AwsRequestID: "abcd-abcd-abcd-abcd",
-		})
-
-		logProd, err := zap.NewProduction()
-		require.NoError(t, err)
-
-		log := logProd.Sugar()
-		defer log.Sync()
-
-		h := NewHandler(nil, nil, validator.New())
-
-		response, cerr := h.UpdateUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Accept":       "application/json",
-				"Content-Type": "application/json",
-			},
-			Body:            `{"key":"value"`,
-			IsBase64Encoded: false,
-		})
-
-		assert.Error(t, cerr)
-		assert.Equal(t,
-			cerror.ErrorBadRequest.HttpStatusCode,
-			cerr.(*cerror.CustomError).HttpStatusCode,
-		)
-		assert.Empty(t, response)
 	})
 
 	t.Run("validation", func(t *testing.T) {
@@ -912,29 +636,23 @@ func TestHandler_UpdateUserById(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, validator.New())
+			h := NewHandler(nil, nil)
 
-			requestBody, err := json.Marshal(&UpdateUserPayload{
+			response, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
 				UserId:   "abcdabcd",
 				Name:     "test",
 				Email:    "test@test.com",
 				Password: "Asdfg12345_",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.UpdateUserById(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Accept":       "application/json",
-					"Content-Type": "application/json",
-				},
-				Body:            string(requestBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerror *cerror.CustomError
+			err = json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerror)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerror.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -951,29 +669,23 @@ func TestHandler_UpdateUserById(t *testing.T) {
 			log := logProd.Sugar()
 			defer log.Sync()
 
-			h := NewHandler(nil, nil, validator.New())
+			h := NewHandler(nil, nil)
 
-			requestBody, err := json.Marshal(&UpdateUserPayload{
+			response, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
 				UserId:   uuid.NewString(),
 				Name:     "",
 				Email:    "",
 				Password: "",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.UpdateUserById(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Accept":       "application/json",
-					"Content-Type": "application/json",
-				},
-				Body:            string(requestBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerror *cerror.CustomError
+			err = json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerror)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerror.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -1005,29 +717,27 @@ func TestHandler_UpdateUserById(t *testing.T) {
 					Password: "Asdfg12345_",
 				},
 			).
-			Return(nil, errors.New("test error"))
+			Return(
+				nil,
+				&cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
+			)
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&UpdateUserPayload{
+		response, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
 			UserId:   userId,
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.UpdateUserById(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Accept":       "application/json",
-				"Content-Type": "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
 
 		assert.Error(t, cerr)
-		assert.Equal(t, errors.New("test error"), cerr)
+		assert.Equal(t,
+			errors.New(`{"httpStatus":500}`),
+			cerr,
+		)
 		assert.Empty(t, response)
 	})
 }
@@ -1060,27 +770,14 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
+		response, err := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
 			UserId:       "abcd-abcd-abcd-abcd",
 			RefreshToken: "abcd.abcd.abcd",
 		})
-		require.NoError(t, err)
 
-		response, err := h.GetAccessTokenViaRefreshToken(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var responseBody map[string]any
-		err = json.Unmarshal([]byte(response.Body), &responseBody)
-
-		assert.Equal(t, "abcd.abcd.abcd", responseBody["accessToken"])
+		assert.Equal(t, "abcd.abcd.abcd", response.Token)
 		assert.NoError(t, err)
 	})
 
@@ -1105,56 +802,15 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
+		response, err := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
 			UserId:       "abcd-abcd-abcd-abcd",
 			RefreshToken: "abcd.abcd.abcd",
 		})
-		require.NoError(t, err)
 
-		response, err := h.GetAccessTokenViaRefreshToken(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
-
-		var responseBody map[string]any
-		err = json.Unmarshal([]byte(response.Body), &responseBody)
-
-		assert.Equal(t, "abcd.abcd.abcd", responseBody["accessToken"])
+		assert.Equal(t, "abcd.abcd.abcd", response.Token)
 		assert.NoError(t, err)
-	})
-
-	t.Run("when request body is ambiguous should return error", func(t *testing.T) {
-		ctx := context.Background()
-		ctx = lambdacontext.NewContext(ctx, &lambdacontext.LambdaContext{
-			AwsRequestID: "abcd-abcd-abcd-abcd",
-		})
-
-		logger, _ := zap.NewProduction()
-		defer logger.Sync()
-
-		h := NewHandler(nil, nil, validator.New())
-
-		response, cerr := h.GetAccessTokenViaRefreshToken(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            `{"key":"value"`,
-			IsBase64Encoded: false,
-		})
-
-		assert.Error(t, cerr)
-		assert.Equal(t,
-			cerror.ErrorBadRequest.HttpStatusCode,
-			cerr.(*cerror.CustomError).HttpStatusCode,
-		)
-		assert.Empty(t, response)
 	})
 
 	t.Run("validation error", func(t *testing.T) {
@@ -1167,27 +823,21 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 			logger, _ := zap.NewProduction()
 			defer logger.Sync()
 
-			h := NewHandler(nil, nil, validator.New())
+			h := NewHandler(nil, nil)
 
-			requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
+			response, cerr := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
 				UserId:       "",
 				RefreshToken: "abcd.abcd.abcd",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.GetAccessTokenViaRefreshToken(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-					"Accept":       "application/json",
-				},
-				Body:            string(requestBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerror *cerror.CustomError
+			err := json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerror)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerror.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -1201,27 +851,21 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 			logger, _ := zap.NewProduction()
 			defer logger.Sync()
 
-			h := NewHandler(nil, nil, validator.New())
+			h := NewHandler(nil, nil)
 
-			requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
+			response, cerr := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
 				UserId:       "",
 				RefreshToken: "abcd.abcdabcd",
 			})
-			require.NoError(t, err)
 
-			response, cerr := h.GetAccessTokenViaRefreshToken(ctx, events.APIGatewayProxyRequest{
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-					"Accept":       "application/json",
-				},
-				Body:            string(requestBody),
-				IsBase64Encoded: false,
-			})
+			var unmarshalledCerror *cerror.CustomError
+			err := json.Unmarshal([]byte(cerr.Error()), &unmarshalledCerror)
+			require.NoError(t, err)
 
 			assert.Error(t, cerr)
 			assert.Equal(t,
 				cerror.ErrorBadRequest.HttpStatusCode,
-				cerr.(*cerror.CustomError).HttpStatusCode,
+				unmarshalledCerror.HttpStatusCode,
 			)
 			assert.Empty(t, response)
 		})
@@ -1243,31 +887,26 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 			).
 			Return(
 				nil,
-				errors.New("test error"),
+				&cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
 			)
 
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 
-		h := NewHandler(mockService, nil, validator.New())
+		h := NewHandler(mockService, nil)
 
-		requestBody, err := json.Marshal(&GetAccessTokenViaRefreshTokenPayload{
+		response, cerr := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
 			UserId:       "abcd-abcd-abcd-abcd",
 			RefreshToken: "abcd.abcd.abcd",
 		})
-		require.NoError(t, err)
-
-		response, cerr := h.GetAccessTokenViaRefreshToken(ctx, events.APIGatewayProxyRequest{
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-				"Accept":       "application/json",
-			},
-			Body:            string(requestBody),
-			IsBase64Encoded: false,
-		})
 
 		assert.Error(t, cerr)
-		assert.Equal(t, errors.New("test error"), cerr)
+		assert.Equal(t,
+			errors.New(`{"httpStatus":500}`),
+			cerr,
+		)
 		assert.Empty(t, response)
 	})
 }

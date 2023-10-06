@@ -7,6 +7,7 @@ package user
 import (
 	context "context"
 	reflect "reflect"
+	cerror "user-api/pkg/cerror"
 	jwt_generator "user-api/pkg/jwt_generator"
 
 	gomock "go.uber.org/mock/gomock"
@@ -36,11 +37,11 @@ func (m *MockService) EXPECT() *MockServiceMockRecorder {
 }
 
 // GetAccessTokenByRefreshToken mocks base method.
-func (m *MockService) GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (*AccessTokenPayload, error) {
+func (m *MockService) GetAccessTokenByRefreshToken(ctx context.Context, userId, refreshToken string) (*AccessTokenPayload, *cerror.CustomError) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAccessTokenByRefreshToken", ctx, userId, refreshToken)
 	ret0, _ := ret[0].(*AccessTokenPayload)
-	ret1, _ := ret[1].(error)
+	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 
@@ -51,11 +52,11 @@ func (mr *MockServiceMockRecorder) GetAccessTokenByRefreshToken(ctx, userId, ref
 }
 
 // Login mocks base method.
-func (m *MockService) Login(ctx context.Context, user *LoginPayload) (*jwt_generator.Tokens, error) {
+func (m *MockService) Login(ctx context.Context, user *LoginPayload) (*jwt_generator.Tokens, *cerror.CustomError) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Login", ctx, user)
 	ret0, _ := ret[0].(*jwt_generator.Tokens)
-	ret1, _ := ret[1].(error)
+	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 
@@ -66,11 +67,11 @@ func (mr *MockServiceMockRecorder) Login(ctx, user interface{}) *gomock.Call {
 }
 
 // Register mocks base method.
-func (m *MockService) Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, error) {
+func (m *MockService) Register(ctx context.Context, user *RegisterPayload) (*jwt_generator.Tokens, *cerror.CustomError) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, user)
 	ret0, _ := ret[0].(*jwt_generator.Tokens)
-	ret1, _ := ret[1].(error)
+	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 
@@ -81,11 +82,11 @@ func (mr *MockServiceMockRecorder) Register(ctx, user interface{}) *gomock.Call 
 }
 
 // UpdateUserById mocks base method.
-func (m *MockService) UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) (*jwt_generator.Tokens, error) {
+func (m *MockService) UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) (*jwt_generator.Tokens, *cerror.CustomError) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateUserById", ctx, userId, user)
 	ret0, _ := ret[0].(*jwt_generator.Tokens)
-	ret1, _ := ret[1].(error)
+	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 

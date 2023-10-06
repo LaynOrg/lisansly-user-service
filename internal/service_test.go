@@ -74,13 +74,13 @@ func TestService_Register(t *testing.T) {
 		require.NoError(t, err)
 
 		service := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := service.Register(ctx, &RegisterPayload{
+		tokens, cerr := service.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.NoError(t, err)
+		assert.Nil(t, cerr)
 		assert.NotEmpty(t, tokens.AccessToken)
 		assert.NotEmpty(t, tokens.RefreshToken)
 	})
@@ -91,17 +91,24 @@ func TestService_Register(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			InsertUser(ctx, gomock.Any()).
-			Return(errors.New("something went wrong"))
+			Return(&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Register(ctx, &RegisterPayload{
+		_, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("something went wrong"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 	})
 
 	t.Run("when error occurred while generate access token should return error", func(t *testing.T) {
@@ -120,16 +127,16 @@ func TestService_Register(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Register(ctx, &RegisterPayload{
+		_, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 
@@ -154,16 +161,16 @@ func TestService_Register(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Register(ctx, &RegisterPayload{
+		_, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 
@@ -178,7 +185,9 @@ func TestService_Register(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
-			Return(errors.New("something went wrong"))
+			Return(&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
 
 		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
@@ -187,14 +196,19 @@ func TestService_Register(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		_, err = userService.Register(ctx, &RegisterPayload{
+		_, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("something went wrong"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 	})
 }
 
@@ -228,12 +242,12 @@ func TestService_Login(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := userService.Login(ctx, &LoginPayload{
+		tokens, cerr := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.NoError(t, err)
+		assert.Nil(t, cerr)
 		assert.NotEmpty(t, tokens.AccessToken)
 		assert.NotEmpty(t, tokens.RefreshToken)
 	})
@@ -252,15 +266,15 @@ func TestService_Login(t *testing.T) {
 			)
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Login(ctx, &LoginPayload{
+		_, cerr := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusUnauthorized,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 
@@ -272,17 +286,24 @@ func TestService_Login(t *testing.T) {
 			FindUserWithEmail(ctx, TestEmail).
 			Return(
 				nil,
-				errors.New("something went wrong"),
+				&cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
 			)
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Login(ctx, &LoginPayload{
+		_, cerr := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("something went wrong"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 	})
 
 	t.Run("when error occurred while compare password should return error", func(t *testing.T) {
@@ -300,15 +321,15 @@ func TestService_Login(t *testing.T) {
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
-		_, err := userService.Login(ctx, &LoginPayload{
+		_, cerr := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusUnauthorized,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 
@@ -334,15 +355,15 @@ func TestService_Login(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Login(ctx, &LoginPayload{
+		_, cerr := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 
@@ -373,15 +394,15 @@ func TestService_Login(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, err := userService.Login(ctx, &LoginPayload{
+		_, cerr := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 
@@ -402,7 +423,9 @@ func TestService_Login(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
-			Return(errors.New("something went wrong"))
+			Return(&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
 
 		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
@@ -411,13 +434,18 @@ func TestService_Login(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		_, err = userService.Login(ctx, &LoginPayload{
+		_, cerr := userService.Login(ctx, &LoginPayload{
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("something went wrong"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 	})
 }
 
@@ -461,9 +489,9 @@ func TestService_UpdateUserById(t *testing.T) {
 		})
 
 		service := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+		tokens, cerr := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
 
-		assert.NoError(t, err)
+		assert.Nil(t, cerr)
 		assert.NotEmpty(t, tokens)
 	})
 
@@ -475,14 +503,21 @@ func TestService_UpdateUserById(t *testing.T) {
 			FindUserWithId(ctx, TestUserId).
 			Return(
 				nil,
-				errors.New("not found"),
+				&cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
 			)
 
 		service := NewService(mockUserRepository, nil)
-		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+		tokens, cerr := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("not found"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 		assert.Empty(t, tokens)
 	})
 
@@ -508,16 +543,16 @@ func TestService_UpdateUserById(t *testing.T) {
 		})
 
 		service := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := service.UpdateUserById(ctx, TestUserId, &UpdateUserPayload{
+		tokens, cerr := service.UpdateUserById(ctx, TestUserId, &UpdateUserPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusConflict,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, tokens)
 	})
@@ -540,13 +575,20 @@ func TestService_UpdateUserById(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			UpdateUserById(gomock.Any(), TestUserId, TestUpdateUserPayload).
-			Return(errors.New("update user error"))
+			Return(&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
 
 		service := NewService(mockUserRepository, nil)
-		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+		tokens, cerr := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("update user error"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 		assert.Empty(t, tokens)
 	})
 
@@ -576,12 +618,12 @@ func TestService_UpdateUserById(t *testing.T) {
 			Return("", errors.New("generate access token error"))
 
 		service := NewService(mockUserRepository, mockJwtGenerator)
-		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+		tokens, cerr := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Empty(t, tokens)
 	})
@@ -616,12 +658,12 @@ func TestService_UpdateUserById(t *testing.T) {
 			Return("", errors.New("generate refresh token error"))
 
 		service := NewService(mockUserRepository, mockJwtGenerator)
-		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+		tokens, cerr := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Empty(t, tokens)
 	})
@@ -648,7 +690,9 @@ func TestService_UpdateUserById(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
-			Return(errors.New("insert refresh token error"))
+			Return(&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
 
 		jwtGenerator, _ := jwt_generator.NewJwtGenerator(&config.JwtConfig{
 			PrivateKey: TestPrivateKey,
@@ -656,10 +700,15 @@ func TestService_UpdateUserById(t *testing.T) {
 		})
 
 		service := NewService(mockUserRepository, jwtGenerator)
-		tokens, err := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
+		tokens, cerr := service.UpdateUserById(ctx, TestUserId, TestUpdateUserPayload)
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("insert refresh token error"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 		assert.Empty(t, tokens)
 	})
 }
@@ -701,9 +750,9 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 		require.NoError(t, err)
 
 		userService := NewService(mockUserRepository, jwtGenerator)
-		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, cerr := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
-		assert.NoError(t, err)
+		assert.Nil(t, cerr)
 		assert.NotEmpty(t, accessToken.Token)
 	})
 
@@ -713,13 +762,23 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindRefreshTokenWithUserId(ctx, TestUserId).
-			Return(nil, errors.New("something went wrong"))
+			Return(
+				nil,
+				&cerror.CustomError{
+					HttpStatusCode: http.StatusInternalServerError,
+				},
+			)
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, cerr := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("something went wrong"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 		assert.Nil(t, accessToken)
 	})
 
@@ -738,12 +797,12 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, cerr := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusForbidden,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, accessToken)
 	})
@@ -763,12 +822,12 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, cerr := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusForbidden,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, accessToken)
 	})
@@ -789,13 +848,20 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 		mockUserRepository.
 			EXPECT().
 			FindUserWithId(ctx, TestUserId).
-			Return(nil, errors.New("something went wrong"))
+			Return(nil, &cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
 
 		userService := NewService(mockUserRepository, nil)
-		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, cerr := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
-		assert.Error(t, err)
-		assert.Equal(t, errors.New("something went wrong"), err)
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
 		assert.Nil(t, accessToken)
 	})
 
@@ -832,12 +898,12 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 			Return("", errors.New("something went wrong"))
 
 		userService := NewService(mockUserRepository, mockJwtGenerator)
-		accessToken, err := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
+		accessToken, cerr := userService.GetAccessTokenByRefreshToken(ctx, TestUserId, TestRefreshToken)
 
-		assert.Error(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			cerror.ErrorGenerateAccessToken.HttpStatusCode,
-			err.(*cerror.CustomError).HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 		assert.Nil(t, accessToken)
 	})

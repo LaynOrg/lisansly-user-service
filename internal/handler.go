@@ -2,12 +2,9 @@ package user
 
 import (
 	"context"
-	"net/http"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/go-playground/validator/v10"
-	"github.com/goccy/go-json"
 	"go.uber.org/zap"
 
 	"user-api/pkg/cerror"
@@ -16,41 +13,14 @@ import (
 )
 
 type Handler interface {
-	CreateUser(
-		ctx context.Context,
-		request events.APIGatewayProxyRequest,
-	) (
-		events.APIGatewayProxyResponse,
-		error,
-	)
-	Login(
-		ctx context.Context,
-		request events.APIGatewayProxyRequest,
-	) (
-		events.APIGatewayProxyResponse,
-		error,
-	)
-	GetUserById(
-		ctx context.Context,
-		request events.APIGatewayProxyRequest,
-	) (
-		events.APIGatewayProxyResponse,
-		error,
-	)
-	UpdateUserById(
-		ctx context.Context,
-		request events.APIGatewayProxyRequest,
-	) (
-		events.APIGatewayProxyResponse,
-		error,
-	)
+	Register(ctx context.Context, request *RegisterPayload) (*jwt_generator.Tokens, error)
+	Login(ctx context.Context, request *LoginPayload) (*jwt_generator.Tokens, error)
+	GetUserById(ctx context.Context, request *GetUserByIdPayload) (*Table, error)
+	UpdateUserById(ctx context.Context, request *UpdateUserPayload) (*jwt_generator.Tokens, error)
 	GetAccessTokenViaRefreshToken(
 		ctx context.Context,
-		request events.APIGatewayProxyRequest,
-	) (
-		events.APIGatewayProxyResponse,
-		error,
-	)
+		request *GetAccessTokenViaRefreshTokenPayload,
+	) (*AccessTokenPayload, error)
 }
 
 type handler struct {
@@ -62,24 +32,15 @@ type handler struct {
 func NewHandler(
 	service Service,
 	repository Repository,
-	validate *validator.Validate,
 ) Handler {
 	return &handler{
 		service:    service,
 		repository: repository,
-		validate:   validate,
+		validate:   validator.New(),
 	}
 }
 
-func (h *handler) CreateUser(
-	ctx context.Context,
-	request events.APIGatewayProxyRequest,
-) (
-	events.APIGatewayProxyResponse,
-	error,
-) {
-	var err error
-
+func (h handler) Register(ctx context.Context, request *RegisterPayload) (*jwt_generator.Tokens, error) {
 	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
@@ -87,60 +48,25 @@ func (h *handler) CreateUser(
 	}
 	ctx = logger.InjectContext(ctx, log)
 
-	var registerPayload *RegisterPayload
-	err = json.Unmarshal([]byte(request.Body), &registerPayload)
+	err := h.validate.Struct(request)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return events.APIGatewayProxyResponse{}, cerr
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	err = h.validate.Struct(registerPayload)
-	if err != nil {
-		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
-	}
-
-	var tokens *jwt_generator.Tokens
-	tokens, err = h.service.Register(ctx, registerPayload)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	var responseBody []byte
-	responseBody, err = json.Marshal(&tokens)
-	if err != nil {
-		cerr := cerror.ErrorJsonMarshalling
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
+	tokens, cerr := h.service.Register(ctx, request)
+	if cerr != nil {
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
 	log.Info(logger.LoggerEventFinished)
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusCreated,
-		Headers: map[string]string{
-			HeaderContentType: MIMEApplicationJson,
-		},
-		Body: string(responseBody),
-	}, nil
+	return tokens, nil
 }
 
-func (h *handler) Login(
-	ctx context.Context,
-	request events.APIGatewayProxyRequest,
-) (
-	events.APIGatewayProxyResponse,
-	error,
-) {
-	var err error
-
+func (h handler) Login(ctx context.Context, request *LoginPayload) (*jwt_generator.Tokens, error) {
 	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
@@ -148,125 +74,54 @@ func (h *handler) Login(
 	}
 	ctx = logger.InjectContext(ctx, log)
 
-	var loginPayload *LoginPayload
-	err = json.Unmarshal([]byte(request.Body), &loginPayload)
+	err := h.validate.Struct(request)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return events.APIGatewayProxyResponse{}, cerr
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	err = h.validate.Struct(loginPayload)
-	if err != nil {
-		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
-	}
-
-	var tokens *jwt_generator.Tokens
-	tokens, err = h.service.Login(ctx, loginPayload)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	var responseBody []byte
-	responseBody, err = json.Marshal(&tokens)
-	if err != nil {
-		cerr := cerror.ErrorJsonMarshalling
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
+	tokens, cerr := h.service.Login(ctx, request)
+	if cerr != nil {
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
 	log.Info(logger.LoggerEventFinished)
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Headers: map[string]string{
-			HeaderContentType: MIMEApplicationJson,
-		},
-		Body: string(responseBody),
-	}, nil
+	return tokens, nil
 }
 
-func (h *handler) GetUserById(
-	ctx context.Context,
-	request events.APIGatewayProxyRequest,
-) (
-	events.APIGatewayProxyResponse,
-	error,
-) {
-	var err error
-
+func (h handler) GetUserById(ctx context.Context, request *GetUserByIdPayload) (*Table, error) {
 	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
 		log = log.With(zap.String("requestId", lc.AwsRequestID))
 	}
 
-	var requestBody *GetUserByIdPayload
-	err = json.Unmarshal([]byte(request.Body), &requestBody)
-	if err != nil {
-		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
-	}
-
-	userId := requestBody.UserId
+	userId := request.UserId
 	log = log.With(zap.String("userId", userId))
 	ctx = logger.InjectContext(ctx, log)
 
-	err = h.validate.Struct(requestBody)
+	err := h.validate.Struct(request)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return events.APIGatewayProxyResponse{}, cerr
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	var userDocument *Table
-	userDocument, err = h.repository.FindUserWithId(ctx, userId)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	var payload []byte
-	payload, err = json.Marshal(userDocument)
-	if err != nil {
-		cerr := cerror.ErrorJsonMarshalling
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
+	userDocument, cerr := h.repository.FindUserWithId(ctx, userId)
+	if cerr != nil {
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
 	log.Info(logger.LoggerEventFinished)
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Headers: map[string]string{
-			HeaderContentType: MIMEApplicationJson,
-		},
-		Body:            string(payload),
-		IsBase64Encoded: false,
-	}, nil
+	return userDocument, nil
 }
 
-func (h *handler) UpdateUserById(
-	ctx context.Context,
-	request events.APIGatewayProxyRequest,
-) (
-	events.APIGatewayProxyResponse,
-	error,
-) {
-	var err error
-
+func (h handler) UpdateUserById(ctx context.Context, request *UpdateUserPayload) (*jwt_generator.Tokens, error) {
 	log := logger.FromContext(ctx)
 	lambdaContext, ok := lambdacontext.FromContext(ctx)
 	if ok {
@@ -276,66 +131,34 @@ func (h *handler) UpdateUserById(
 	}
 	ctx = logger.InjectContext(ctx, log)
 
-	var requestPayload *UpdateUserPayload
-	err = json.Unmarshal([]byte(request.Body), &requestPayload)
-	if err != nil {
-		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
-	}
-
-	userId := requestPayload.UserId
+	userId := request.UserId
 	log = log.With(
 		zap.String("userId", userId),
 	)
 	ctx = logger.InjectContext(ctx, log)
 
-	err = h.validate.Struct(requestPayload)
+	err := h.validate.Struct(request)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return events.APIGatewayProxyResponse{}, cerr
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	var tokens *jwt_generator.Tokens
-	tokens, err = h.service.UpdateUserById(ctx, userId, requestPayload)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	var responseBody []byte
-	responseBody, err = json.Marshal(tokens)
-	if err != nil {
-		cerr := cerror.ErrorJsonMarshalling
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
+	tokens, cerr := h.service.UpdateUserById(ctx, userId, request)
+	if cerr != nil {
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
 	log.Info(logger.LoggerEventFinished)
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Headers: map[string]string{
-			HeaderContentType: MIMEApplicationJson,
-		},
-		Body: string(responseBody),
-	}, nil
+	return tokens, nil
 }
 
-func (h *handler) GetAccessTokenViaRefreshToken(
+func (h handler) GetAccessTokenViaRefreshToken(
 	ctx context.Context,
-	request events.APIGatewayProxyRequest,
-) (
-	events.APIGatewayProxyResponse,
-	error,
-) {
-	var err error
-
+	request *GetAccessTokenViaRefreshTokenPayload,
+) (*AccessTokenPayload, error) {
 	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
@@ -343,51 +166,24 @@ func (h *handler) GetAccessTokenViaRefreshToken(
 	}
 	ctx = logger.InjectContext(ctx, log)
 
-	var requestBody *GetAccessTokenViaRefreshTokenPayload
-	err = json.Unmarshal([]byte(request.Body), &requestBody)
+	err := h.validate.Struct(request)
 	if err != nil {
 		cerr := cerror.ErrorBadRequest
 		cerr.LogFields = []zap.Field{
 			zap.Error(err),
 		}
-		return events.APIGatewayProxyResponse{}, cerr
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	err = h.validate.Struct(requestBody)
-	if err != nil {
-		cerr := cerror.ErrorBadRequest
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
-	}
-
-	var accessToken *AccessTokenPayload
-	accessToken, err = h.service.GetAccessTokenByRefreshToken(
+	accessToken, cerr := h.service.GetAccessTokenByRefreshToken(
 		ctx,
-		requestBody.UserId,
-		requestBody.RefreshToken,
+		request.UserId,
+		request.RefreshToken,
 	)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	var responseBody []byte
-	responseBody, err = json.Marshal(&accessToken)
-	if err != nil {
-		cerr := cerror.ErrorJsonMarshalling
-		cerr.LogFields = []zap.Field{
-			zap.Error(err),
-		}
-		return events.APIGatewayProxyResponse{}, cerr
+	if cerr != nil {
+		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
 	log.Info(logger.LoggerEventFinished)
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Headers: map[string]string{
-			HeaderContentType: MIMEApplicationJson,
-		},
-		Body: string(responseBody),
-	}, nil
+	return accessToken, nil
 }

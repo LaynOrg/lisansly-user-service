@@ -7,11 +7,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsCfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 
 	user "user-api/internal"
-	"user-api/pkg/cerror"
 	"user-api/pkg/config"
 	"user-api/pkg/jwt_generator"
 )
@@ -59,14 +57,7 @@ func main() {
 	handler := user.NewHandler(
 		service,
 		nil,
-		validator.New(),
 	)
 
-	lambda.Start(
-		cerror.WithMiddleware(
-			log,
-			cerror.ErrorHandler,
-			handler.UpdateUserById,
-		),
-	)
+	lambda.Start(handler.UpdateUserById)
 }
