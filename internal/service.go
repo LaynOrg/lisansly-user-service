@@ -286,8 +286,9 @@ func (s *service) GetAccessTokenByRefreshToken(
 		}
 	}
 
-	refreshTokenExpire := time.Now().UTC().After(refreshTokenDocument.ExpiresAt)
-	if refreshTokenExpire {
+	now := time.Now().UTC()
+	refreshTokenExpire := refreshTokenDocument.ExpiresAt.After(now)
+	if !refreshTokenExpire {
 		return nil, &cerror.CustomError{
 			HttpStatusCode: http.StatusForbidden,
 			LogMessage:     "refresh token expired",
