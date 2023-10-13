@@ -4,16 +4,15 @@ import (
 	"errors"
 
 	"github.com/goccy/go-json"
-	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 type CustomError struct {
 	error          `json:"-"`
-	HttpStatusCode int           `json:"httpStatus"`
-	LogMessage     string        `json:"-"`
-	LogSeverity    zapcore.Level `json:"-"`
-	LogFields      []zap.Field   `json:"-"`
+	HttpStatusCode int             `json:"httpStatus"`
+	LogMessage     string          `json:"-"`
+	LogSeverity    zapcore.Level   `json:"-"`
+	LogFields      []zapcore.Field `json:"-"`
 }
 
 func (cerr *CustomError) SerializeCerror() error {

@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"user-api/pkg/cerror"
 	"user-api/pkg/config"
@@ -138,7 +137,7 @@ func (r *repository) InsertUser(ctx context.Context, user *Table) *cerror.Custom
 			return &cerror.CustomError{
 				HttpStatusCode: http.StatusConflict,
 				LogMessage:     "user already exist",
-				LogSeverity:    zapcore.WarnLevel,
+				LogSeverity:    zap.WarnLevel,
 			}
 		}
 
@@ -475,7 +474,7 @@ func (r *repository) UpdateUserById(
 				return &cerror.CustomError{
 					HttpStatusCode: http.StatusConflict,
 					LogMessage:     "email address already exist in user table",
-					LogSeverity:    zapcore.WarnLevel,
+					LogSeverity:    zap.WarnLevel,
 					LogFields: []zap.Field{
 						zap.Error(emailAlreadyExist),
 					},

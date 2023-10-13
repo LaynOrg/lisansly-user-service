@@ -6,14 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func TestCustomError_SerializeCerror(t *testing.T) {
 	cerr := &CustomError{
 		HttpStatusCode: http.StatusInternalServerError,
 		LogMessage:     "test error",
-		LogSeverity:    zapcore.ErrorLevel,
+		LogSeverity:    zap.ErrorLevel,
 		LogFields: []zap.Field{
 			zap.String("key", "value"),
 		},

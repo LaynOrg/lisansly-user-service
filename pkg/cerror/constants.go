@@ -3,7 +3,6 @@ package cerror
 import (
 	"net/http"
 
-	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -26,21 +25,15 @@ var (
 		LogSeverity:    zapcore.ErrorLevel,
 	}
 
-	ErrorJsonMarshalling = &CustomError{
-		HttpStatusCode: http.StatusInternalServerError,
-		LogMessage:     "error occurred while marshalling response body",
-		LogSeverity:    zap.ErrorLevel,
-	}
-
 	ErrorBuildExpression = &CustomError{
 		HttpStatusCode: http.StatusInternalServerError,
 		LogMessage:     "error occurred while build update expression",
-		LogSeverity:    zap.ErrorLevel,
+		LogSeverity:    zapcore.ErrorLevel,
 	}
 
 	ErrorUserNotFound = &CustomError{
 		HttpStatusCode: http.StatusNotFound,
 		LogMessage:     "user not found",
-		LogSeverity:    zap.ErrorLevel,
+		LogSeverity:    zapcore.ErrorLevel,
 	}
 )

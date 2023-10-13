@@ -2,12 +2,12 @@ package user
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/bcrypt"
 
 	"user-api/pkg/cerror"
@@ -59,7 +59,7 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 		return nil, &cerror.CustomError{
 			HttpStatusCode: http.StatusInternalServerError,
 			LogMessage:     "error occurred while generate hash from password",
-			LogSeverity:    zapcore.ErrorLevel,
+			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
 			},
@@ -132,7 +132,7 @@ func (s *service) Login(
 			return nil, &cerror.CustomError{
 				HttpStatusCode: http.StatusUnauthorized,
 				LogMessage:     "user credentials invalid",
-				LogSeverity:    zapcore.WarnLevel,
+				LogSeverity:    zap.WarnLevel,
 			}
 		}
 		return nil, customError
@@ -143,7 +143,7 @@ func (s *service) Login(
 		return nil, &cerror.CustomError{
 			HttpStatusCode: http.StatusUnauthorized,
 			LogMessage:     "error occurred while compare passwords",
-			LogSeverity:    zapcore.WarnLevel,
+			LogSeverity:    zap.WarnLevel,
 		}
 	}
 
@@ -206,10 +206,19 @@ func (s *service) UpdateUserById(
 	if updateUser.Password != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updateUser.Password), bcrypt.DefaultCost)
 		if err != nil {
+			isErrPasswordTooLong := errors.Is(err, bcrypt.ErrPasswordTooLong)
+			if isErrPasswordTooLong {
+				return nil, &cerror.CustomError{
+					HttpStatusCode: http.StatusBadRequest,
+					LogMessage:     "password length bigger than 72 length",
+					LogSeverity:    zap.WarnLevel,
+				}
+			}
+
 			return nil, &cerror.CustomError{
 				HttpStatusCode: http.StatusInternalServerError,
 				LogMessage:     "error occurred while generate hash from password",
-				LogSeverity:    zapcore.ErrorLevel,
+				LogSeverity:    zap.ErrorLevel,
 				LogFields: []zap.Field{
 					zap.Error(err),
 				},
@@ -282,7 +291,7 @@ func (s *service) GetAccessTokenByRefreshToken(
 		return nil, &cerror.CustomError{
 			HttpStatusCode: http.StatusForbidden,
 			LogMessage:     "invalid refresh token",
-			LogSeverity:    zapcore.WarnLevel,
+			LogSeverity:    zap.WarnLevel,
 		}
 	}
 
@@ -292,7 +301,7 @@ func (s *service) GetAccessTokenByRefreshToken(
 		return nil, &cerror.CustomError{
 			HttpStatusCode: http.StatusForbidden,
 			LogMessage:     "refresh token expired",
-			LogSeverity:    zapcore.WarnLevel,
+			LogSeverity:    zap.WarnLevel,
 		}
 	}
 
