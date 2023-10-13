@@ -7,6 +7,9 @@ provider:
   architecture: arm64
   region: us-west-1
   environment: ${file(env.${opt:stage, self:provider.stage}.json)}
+  iam:
+    role:
+      statements: ${file(config.${opt:stage, self:provider.stage}.json):iamRoleStatements}
 
 package:
   individually: true
