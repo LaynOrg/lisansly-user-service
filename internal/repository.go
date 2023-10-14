@@ -215,7 +215,6 @@ func (r *repository) FindUserWithId(ctx context.Context, userId string) (*Table,
 		KeyConditionExpression:    expr.KeyCondition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
-		Limit:                     aws.Int32(1),
 		TableName:                 aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable]),
 	})
 	if err != nil {
@@ -272,7 +271,6 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Tabl
 		FilterExpression:          expr.Filter(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
-		Limit:                     aws.Int32(1),
 		TableName:                 aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable]),
 	})
 	if err != nil {
@@ -333,7 +331,6 @@ func (r *repository) FindRefreshTokenWithUserId(
 		FilterExpression:          expr.Filter(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
-		Limit:                     aws.Int32(1),
 		TableName:                 aws.String(r.dynamodbConfig.Tables[config.DynamoDbRefreshTokenHistoryTable]),
 	})
 	if err != nil {
