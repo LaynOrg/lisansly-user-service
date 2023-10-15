@@ -56,15 +56,22 @@ func TestService_Register(t *testing.T) {
 
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		mockUserRepository := NewMockRepository(mockController)
-		mockUserRepository.
+		mocRepository := NewMockRepository(mockController)
+		mocRepository.
 			EXPECT().
 			InsertUser(ctx, gomock.Any()).
 			Return(nil)
-
-		mockUserRepository.
+		mocRepository.
 			EXPECT().
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
+			Return(nil)
+		mocRepository.
+			EXPECT().
+			InsertIdentityVerificationHistory(ctx, gomock.Any()).
+			Return(nil)
+		mocRepository.
+			EXPECT().
+			SendEmailVerificationMessage(ctx, gomock.Any()).
 			Return(nil)
 
 		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
@@ -73,7 +80,7 @@ func TestService_Register(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		service := NewService(mockUserRepository, jwtGenerator)
+		service := NewService(mocRepository, jwtGenerator)
 		tokens, cerr := service.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
@@ -96,7 +103,7 @@ func TestService_Register(t *testing.T) {
 			})
 
 		userService := NewService(mockUserRepository, nil)
-		_, cerr := userService.Register(ctx, &RegisterPayload{
+		tokens, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -109,25 +116,24 @@ func TestService_Register(t *testing.T) {
 			},
 			cerr,
 		)
+		assert.Nil(t, tokens)
 	})
 
 	t.Run("when error occurred while generate access token should return error", func(t *testing.T) {
 		ctx := context.Background()
-		mockUserRepository := NewMockRepository(mockController)
+		mockRepository := NewMockRepository(mockController)
 		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
-
-		mockUserRepository.
+		mockRepository.
 			EXPECT().
 			InsertUser(ctx, gomock.Any()).
 			Return(nil)
-
 		mockJwtGenerator.
 			EXPECT().
 			GenerateAccessToken(gomock.Any(), TestUserName, TestEmail, gomock.Any()).
 			Return("", errors.New("something went wrong"))
 
-		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, cerr := userService.Register(ctx, &RegisterPayload{
+		userService := NewService(mockRepository, mockJwtGenerator)
+		tokens, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -138,30 +144,28 @@ func TestService_Register(t *testing.T) {
 			http.StatusInternalServerError,
 			cerr.HttpStatusCode,
 		)
+		assert.Nil(t, tokens)
 	})
 
 	t.Run("when error occurred while generate refresh token should return error", func(t *testing.T) {
 		ctx := context.Background()
-		mockUserRepository := NewMockRepository(mockController)
+		mockRepository := NewMockRepository(mockController)
 		mockJwtGenerator := jwt_generator.NewMockJwtGenerator(mockController)
-
-		mockUserRepository.
+		mockRepository.
 			EXPECT().
 			InsertUser(ctx, gomock.Any()).
 			Return(nil)
-
 		mockJwtGenerator.
 			EXPECT().
 			GenerateAccessToken(gomock.Any(), TestUserName, TestEmail, gomock.Any()).
 			Return(TestAccessToken, nil)
-
 		mockJwtGenerator.
 			EXPECT().
 			GenerateRefreshToken(gomock.Any(), gomock.Any()).
 			Return("", errors.New("something went wrong"))
 
-		userService := NewService(mockUserRepository, mockJwtGenerator)
-		_, cerr := userService.Register(ctx, &RegisterPayload{
+		userService := NewService(mockRepository, mockJwtGenerator)
+		tokens, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -172,17 +176,17 @@ func TestService_Register(t *testing.T) {
 			http.StatusInternalServerError,
 			cerr.HttpStatusCode,
 		)
+		assert.Nil(t, tokens)
 	})
 
 	t.Run("when error occurred while insert refresh token should return error", func(t *testing.T) {
 		ctx := context.Background()
-		mockUserRepository := NewMockRepository(mockController)
-		mockUserRepository.
+		mockRepository := NewMockRepository(mockController)
+		mockRepository.
 			EXPECT().
 			InsertUser(ctx, gomock.Any()).
 			Return(nil)
-
-		mockUserRepository.
+		mockRepository.
 			EXPECT().
 			InsertRefreshTokenHistory(ctx, gomock.Any()).
 			Return(&cerror.CustomError{
@@ -195,8 +199,8 @@ func TestService_Register(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		userService := NewService(mockUserRepository, jwtGenerator)
-		_, cerr := userService.Register(ctx, &RegisterPayload{
+		userService := NewService(mockRepository, jwtGenerator)
+		tokens, cerr := userService.Register(ctx, &RegisterPayload{
 			Name:     TestUserName,
 			Email:    TestEmail,
 			Password: TestPassword,
@@ -209,6 +213,93 @@ func TestService_Register(t *testing.T) {
 			},
 			cerr,
 		)
+		assert.Nil(t, tokens)
+	})
+
+	t.Run("when error occurred while insert identity verification code should return error", func(t *testing.T) {
+		ctx := context.Background()
+		mocRepository := NewMockRepository(mockController)
+		mocRepository.
+			EXPECT().
+			InsertUser(ctx, gomock.Any()).
+			Return(nil)
+		mocRepository.
+			EXPECT().
+			InsertRefreshTokenHistory(ctx, gomock.Any()).
+			Return(nil)
+		mocRepository.
+			EXPECT().
+			InsertIdentityVerificationHistory(ctx, gomock.Any()).
+			Return(&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
+
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
+			PrivateKey: TestPrivateKey,
+			PublicKey:  TestPublicKey,
+		})
+		require.NoError(t, err)
+
+		service := NewService(mocRepository, jwtGenerator)
+		tokens, cerr := service.Register(ctx, &RegisterPayload{
+			Name:     TestUserName,
+			Email:    TestEmail,
+			Password: TestPassword,
+		})
+
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
+		assert.Nil(t, tokens)
+	})
+
+	t.Run("when error occurred while send email verification message should return error", func(t *testing.T) {
+		ctx := context.Background()
+		mocRepository := NewMockRepository(mockController)
+		mocRepository.
+			EXPECT().
+			InsertUser(ctx, gomock.Any()).
+			Return(nil)
+		mocRepository.
+			EXPECT().
+			InsertRefreshTokenHistory(ctx, gomock.Any()).
+			Return(nil)
+		mocRepository.
+			EXPECT().
+			InsertIdentityVerificationHistory(ctx, gomock.Any()).
+			Return(nil)
+		mocRepository.
+			EXPECT().
+			SendEmailVerificationMessage(ctx, gomock.Any()).
+			Return(&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			})
+
+		jwtGenerator, err := jwt_generator.NewJwtGenerator(&config.JwtConfig{
+			PrivateKey: TestPrivateKey,
+			PublicKey:  TestPublicKey,
+		})
+		require.NoError(t, err)
+
+		service := NewService(mocRepository, jwtGenerator)
+		tokens, cerr := service.Register(ctx, &RegisterPayload{
+			Name:     TestUserName,
+			Email:    TestEmail,
+			Password: TestPassword,
+		})
+
+		assert.NotNil(t, cerr)
+		assert.Equal(t,
+			&cerror.CustomError{
+				HttpStatusCode: http.StatusInternalServerError,
+			},
+			cerr,
+		)
+		assert.Nil(t, tokens)
 	})
 }
 

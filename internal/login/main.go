@@ -39,7 +39,7 @@ func main() {
 	}
 
 	dynamodbClient := dynamodb.NewFromConfig(cfg)
-	repository := user.NewRepository(dynamodbClient, dynamoDbConfig)
+	repository := user.NewRepository(dynamodbClient, dynamoDbConfig, nil, nil)
 	var jwtConfig *config.JwtConfig
 	jwtConfig, err = config.ReadJwtConfig()
 	if err != nil {

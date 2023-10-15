@@ -125,7 +125,9 @@ jobs:
             "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
             "DYNAMODB_USER_TABLE": "${{ vars.DYNAMODB_USER_TABLE }}",
             "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ vars.DYNAMODB_USER_UNIQUENESS_TABLE }}",
-            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ vars.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
+            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ vars.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}",
+            "AWS_ACCOUNT_ID": "${{ secrets.AWS_ACCOUNT_ID }}",
+            "SQS_EMAIL_VERIFICATION_QUEUE_NAME": "${{ vars.SQS_EMAIL_VERIFICATION_QUEUE_NAME }}"
           }' > env.dev.json
 
       - name: Deploy To Dev Environment
@@ -171,7 +173,9 @@ jobs:
             "JWT_PUBLIC_KEY": "${{ secrets.JWT_PUBLIC_KEY }}",
             "DYNAMODB_USER_TABLE": "${{ vars.DYNAMODB_USER_TABLE }}",
             "DYNAMODB_USER_UNIQUENESS_TABLE": "${{ vars.DYNAMODB_USER_UNIQUENESS_TABLE }}",
-            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ vars.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}"
+            "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE": "${{ vars.DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE }}",
+            "AWS_ACCOUNT_ID": "${{ secrets.AWS_ACCOUNT_ID }}",
+            "SQS_EMAIL_VERIFICATION_QUEUE_NAME": "${{ vars.SQS_EMAIL_VERIFICATION_QUEUE_NAME }}"
           }' > env.production.json
 
       - name: Deploy To Production Environment

@@ -80,6 +80,20 @@ func (mr *MockRepositoryMockRecorder) FindUserWithId(ctx, userId interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUserWithId", reflect.TypeOf((*MockRepository)(nil).FindUserWithId), ctx, userId)
 }
 
+// InsertIdentityVerificationHistory mocks base method.
+func (m *MockRepository) InsertIdentityVerificationHistory(ctx context.Context, identityVerification *IdentityVerificationTable) *cerror.CustomError {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertIdentityVerificationHistory", ctx, identityVerification)
+	ret0, _ := ret[0].(*cerror.CustomError)
+	return ret0
+}
+
+// InsertIdentityVerificationHistory indicates an expected call of InsertIdentityVerificationHistory.
+func (mr *MockRepositoryMockRecorder) InsertIdentityVerificationHistory(ctx, identityVerification interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertIdentityVerificationHistory", reflect.TypeOf((*MockRepository)(nil).InsertIdentityVerificationHistory), ctx, identityVerification)
+}
+
 // InsertRefreshTokenHistory mocks base method.
 func (m *MockRepository) InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) *cerror.CustomError {
 	m.ctrl.T.Helper()
@@ -106,6 +120,20 @@ func (m *MockRepository) InsertUser(ctx context.Context, user *Table) *cerror.Cu
 func (mr *MockRepositoryMockRecorder) InsertUser(ctx, user interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertUser", reflect.TypeOf((*MockRepository)(nil).InsertUser), ctx, user)
+}
+
+// SendEmailVerificationMessage mocks base method.
+func (m *MockRepository) SendEmailVerificationMessage(ctx context.Context, verificationSqsMessageBody *EmailVerificationSqsMessageBody) *cerror.CustomError {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendEmailVerificationMessage", ctx, verificationSqsMessageBody)
+	ret0, _ := ret[0].(*cerror.CustomError)
+	return ret0
+}
+
+// SendEmailVerificationMessage indicates an expected call of SendEmailVerificationMessage.
+func (mr *MockRepositoryMockRecorder) SendEmailVerificationMessage(ctx, verificationSqsMessageBody interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendEmailVerificationMessage", reflect.TypeOf((*MockRepository)(nil).SendEmailVerificationMessage), ctx, verificationSqsMessageBody)
 }
 
 // UpdateUserById mocks base method.

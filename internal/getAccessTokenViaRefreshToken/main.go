@@ -39,7 +39,7 @@ func main() {
 	}
 
 	dynamodbClient := dynamodb.NewFromConfig(cfg)
-	repository := user.NewRepository(dynamodbClient, dynamodbConfig)
+	repository := user.NewRepository(dynamodbClient, dynamodbConfig, nil, nil)
 	if err != nil {
 		log.Panic(err)
 	}

@@ -110,3 +110,43 @@ func TestReadJwtConfig(t *testing.T) {
 		assert.Empty(t, jwtConfig)
 	})
 }
+
+func TestReadSqsConfig(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		var err error
+
+		err = os.Setenv(AwsAccountId, "aws-account-id")
+		require.NoError(t, err)
+
+		err = os.Setenv(SQSEmailVerificationQueueName, "email-verification-queue-name")
+		require.NoError(t, err)
+
+		defer os.Clearenv()
+
+		sqsConfig, err := ReadSqsConfig()
+
+		assert.NoError(t, err)
+		assert.NotEmpty(t, sqsConfig)
+	})
+
+	t.Run("empty aws account id", func(t *testing.T) {
+		sqsConfig, err := ReadSqsConfig()
+
+		assert.Error(t, err)
+		assert.Empty(t, sqsConfig)
+	})
+
+	t.Run("empty sqs email verification queue name", func(t *testing.T) {
+		var err error
+
+		err = os.Setenv(AwsAccountId, "aws-account-id")
+		require.NoError(t, err)
+
+		defer os.Clearenv()
+
+		sqsConfig, err := ReadSqsConfig()
+
+		assert.Error(t, err)
+		assert.Empty(t, sqsConfig)
+	})
+}

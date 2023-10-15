@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsCfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"go.uber.org/zap"
 
 	user "user-api/internal"
@@ -32,6 +33,12 @@ func main() {
 		log.Panic(err)
 	}
 
+	var sqsConfig *config.SQSConfig
+	sqsConfig, err = config.ReadSqsConfig()
+	if err != nil {
+		log.Panic(err)
+	}
+
 	var cfg aws.Config
 	cfg, err = awsCfg.LoadDefaultConfig(context.TODO())
 	if err != nil {
@@ -39,7 +46,8 @@ func main() {
 	}
 
 	dynamodbClient := dynamodb.NewFromConfig(cfg)
-	repository := user.NewRepository(dynamodbClient, dynamodbConfig)
+	sqsClient := sqs.NewFromConfig(cfg)
+	repository := user.NewRepository(dynamodbClient, dynamodbConfig, sqsClient, sqsConfig)
 
 	var jwtConfig *config.JwtConfig
 	jwtConfig, err = config.ReadJwtConfig()

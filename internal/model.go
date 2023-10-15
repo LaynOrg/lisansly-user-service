@@ -3,11 +3,13 @@ package user
 import "time"
 
 const (
-	UniquenessEmail = "EMAIL"
+	RoleUser = "user"
 )
 
+type IdentityType string
+
 const (
-	RoleUser = "user"
+	IdentityEmail IdentityType = "EMAIL"
 )
 
 type AccessTokenPayload struct {
@@ -53,8 +55,8 @@ type Table struct {
 }
 
 type UniquenessTable struct {
-	Unique string `dynamodbav:"unique"`
-	Type   string `dynamodbav:"type"`
+	Unique string       `dynamodbav:"unique"`
+	Type   IdentityType `dynamodbav:"type"`
 }
 
 type RefreshTokenHistoryTable struct {
@@ -62,4 +64,17 @@ type RefreshTokenHistoryTable struct {
 	UserID    string    `dynamodbav:"userId"`
 	Token     string    `dynamodbav:"token"`
 	ExpiresAt time.Time `dynamodbav:"expiresAt"`
+}
+
+type IdentityVerificationTable struct {
+	Id        string       `dynamodbav:"id"`
+	UserID    string       `dynamodbav:"userId"`
+	Type      IdentityType `dynamodbav:"identityType"`
+	Code      string       `dynamodbav:"code"`
+	ExpiresAt time.Time    `dynamodbav:"expiresAt"`
+}
+
+type EmailVerificationSqsMessageBody struct {
+	Email            string `json:"email"`
+	VerificationCode string `json:"verificationCode"`
 }

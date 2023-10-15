@@ -9,7 +9,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	dynamodbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqsTypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"github.com/goccy/go-json"
 	"go.uber.org/zap"
 
 	"user-api/pkg/cerror"
@@ -23,27 +26,39 @@ type Repository interface {
 	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) *cerror.CustomError
 	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, *cerror.CustomError)
 	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) *cerror.CustomError
+	InsertIdentityVerificationHistory(
+		ctx context.Context, identityVerification *IdentityVerificationTable,
+	) *cerror.CustomError
+	SendEmailVerificationMessage(
+		ctx context.Context, verificationSqsMessageBody *EmailVerificationSqsMessageBody,
+	) *cerror.CustomError
 }
 
 type repository struct {
 	dynamodbClient *dynamodb.Client
 	dynamodbConfig *config.DynamoDbConfig
+	sqsClient      *sqs.Client
+	sqsConfig      *config.SQSConfig
 }
 
 func NewRepository(
 	dynamodbClient *dynamodb.Client,
 	dynamodbConfig *config.DynamoDbConfig,
+	sqsClient *sqs.Client,
+	sqsConfig *config.SQSConfig,
 ) Repository {
 	return &repository{
 		dynamodbClient: dynamodbClient,
 		dynamodbConfig: dynamodbConfig,
+		sqsClient:      sqsClient,
+		sqsConfig:      sqsConfig,
 	}
 }
 
 func (r *repository) InsertUser(ctx context.Context, user *Table) *cerror.CustomError {
 	var err error
 
-	var userItem map[string]types.AttributeValue
+	var userItem map[string]dynamodbTypes.AttributeValue
 	userItem, err = attributevalue.MarshalMap(user)
 	if err != nil {
 		return &cerror.CustomError{
@@ -56,10 +71,10 @@ func (r *repository) InsertUser(ctx context.Context, user *Table) *cerror.Custom
 		}
 	}
 
-	var userUniquenessItem map[string]types.AttributeValue
+	var userUniquenessItem map[string]dynamodbTypes.AttributeValue
 	userUniquenessItem, err = attributevalue.MarshalMap(&UniquenessTable{
 		Unique: user.Email,
-		Type:   UniquenessEmail,
+		Type:   IdentityEmail,
 	})
 	if err != nil {
 		return &cerror.CustomError{
@@ -111,9 +126,9 @@ func (r *repository) InsertUser(ctx context.Context, user *Table) *cerror.Custom
 	userTableName := aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable])
 	userUniquenessTableName := aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserUniquenessTable])
 	_, err = r.dynamodbClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
+		TransactItems: []dynamodbTypes.TransactWriteItem{
 			{
-				Put: &types.Put{
+				Put: &dynamodbTypes.Put{
 					Item:                     userItem,
 					ConditionExpression:      userIdExpression.Condition(),
 					ExpressionAttributeNames: userIdExpression.Names(),
@@ -121,7 +136,7 @@ func (r *repository) InsertUser(ctx context.Context, user *Table) *cerror.Custom
 				},
 			},
 			{
-				Put: &types.Put{
+				Put: &dynamodbTypes.Put{
 					Item:                     userUniquenessItem,
 					ConditionExpression:      userEmailExpression.Condition(),
 					ExpressionAttributeNames: userEmailExpression.Names(),
@@ -131,7 +146,7 @@ func (r *repository) InsertUser(ctx context.Context, user *Table) *cerror.Custom
 		},
 	})
 	if err != nil {
-		var alreadyExistError *types.TransactionCanceledException
+		var alreadyExistError *dynamodbTypes.TransactionCanceledException
 		ok := errors.As(err, &alreadyExistError)
 		if ok {
 			return &cerror.CustomError{
@@ -160,12 +175,12 @@ func (r *repository) InsertRefreshTokenHistory(
 ) *cerror.CustomError {
 	var err error
 
-	var refreshTokenHistoryItem map[string]types.AttributeValue
+	var refreshTokenHistoryItem map[string]dynamodbTypes.AttributeValue
 	refreshTokenHistoryItem, err = attributevalue.MarshalMap(refreshTokenHistory)
 	if err != nil {
 		return &cerror.CustomError{
 			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while marshal refresh token history",
+			LogMessage:     "error occurred while marshal refresh token history item",
 			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
@@ -181,7 +196,7 @@ func (r *repository) InsertRefreshTokenHistory(
 	if err != nil {
 		return &cerror.CustomError{
 			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while insert refresh token history",
+			LogMessage:     "error occurred while insert refresh token history item",
 			LogSeverity:    zap.ErrorLevel,
 			LogFields: []zap.Field{
 				zap.Error(err),
@@ -375,8 +390,8 @@ func (r *repository) UpdateUserById(
 		err                 error
 		userTable           = aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserTable])
 		userUniquenessTable = aws.String(r.dynamodbConfig.Tables[config.DynamoDbUserUniquenessTable])
-		userIdKey           = map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: userId},
+		userIdKey           = map[string]dynamodbTypes.AttributeValue{
+			"id": &dynamodbTypes.AttributeValueMemberS{Value: userId},
 		}
 	)
 
@@ -419,10 +434,10 @@ func (r *repository) UpdateUserById(
 			}
 		}
 
-		var emailUniquenessItem map[string]types.AttributeValue
+		var emailUniquenessItem map[string]dynamodbTypes.AttributeValue
 		emailUniquenessItem, err = attributevalue.MarshalMap(&UniquenessTable{
 			Unique: updateUserPayload.Email,
-			Type:   UniquenessEmail,
+			Type:   IdentityEmail,
 		})
 		if err != nil {
 			return &cerror.CustomError{
@@ -436,9 +451,9 @@ func (r *repository) UpdateUserById(
 		}
 
 		_, err = r.dynamodbClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-			TransactItems: []types.TransactWriteItem{
+			TransactItems: []dynamodbTypes.TransactWriteItem{
 				{
-					Update: &types.Update{
+					Update: &dynamodbTypes.Update{
 						Key:                       userIdKey,
 						TableName:                 userTable,
 						UpdateExpression:          updateExpression.Update(),
@@ -447,17 +462,17 @@ func (r *repository) UpdateUserById(
 					},
 				},
 				{
-					Delete: &types.Delete{
+					Delete: &dynamodbTypes.Delete{
 						TableName: userUniquenessTable,
-						Key: map[string]types.AttributeValue{
-							"unique": &types.AttributeValueMemberS{
+						Key: map[string]dynamodbTypes.AttributeValue{
+							"unique": &dynamodbTypes.AttributeValueMemberS{
 								Value: userInDatabase.Email,
 							},
 						},
 					},
 				},
 				{
-					Put: &types.Put{
+					Put: &dynamodbTypes.Put{
 						Item:      emailUniquenessItem,
 						TableName: userUniquenessTable,
 					},
@@ -465,7 +480,7 @@ func (r *repository) UpdateUserById(
 			},
 		})
 		if err != nil {
-			var emailAlreadyExist *types.ConditionalCheckFailedException
+			var emailAlreadyExist *dynamodbTypes.ConditionalCheckFailedException
 			ok := errors.As(err, &emailAlreadyExist)
 			if ok {
 				return &cerror.CustomError{
@@ -493,7 +508,7 @@ func (r *repository) UpdateUserById(
 			UpdateExpression:          updateExpression.Update(),
 			ExpressionAttributeNames:  updateExpression.Names(),
 			ExpressionAttributeValues: updateExpression.Values(),
-			ReturnValues:              types.ReturnValueNone,
+			ReturnValues:              dynamodbTypes.ReturnValueNone,
 			TableName:                 userTable,
 		})
 		if err != nil {
@@ -502,6 +517,110 @@ func (r *repository) UpdateUserById(
 				LogMessage:     "error occurred while update user",
 				LogSeverity:    zap.ErrorLevel,
 			}
+		}
+	}
+
+	return nil
+}
+
+func (r *repository) InsertIdentityVerificationHistory(
+	ctx context.Context, identityVerification *IdentityVerificationTable,
+) *cerror.CustomError {
+	var err error
+
+	var identityVerificationItem map[string]dynamodbTypes.AttributeValue
+	identityVerificationItem, err = attributevalue.MarshalMap(identityVerification)
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshal identity verification history item",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	tableName := aws.String(r.dynamodbConfig.Tables[config.DynamoDbIdentityVerificationHistoryTable])
+	_, err = r.dynamodbClient.PutItem(ctx, &dynamodb.PutItemInput{
+		Item:      identityVerificationItem,
+		TableName: tableName,
+	})
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while insert identity verification history item",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	return nil
+}
+
+func (r *repository) SendEmailVerificationMessage(
+	ctx context.Context, verificationSqsMessageBody *EmailVerificationSqsMessageBody,
+) *cerror.CustomError {
+	var err error
+
+	var messageBodyBytes []byte
+	messageBodyBytes, err = json.Marshal(verificationSqsMessageBody)
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while marshal identity verification email message",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	queueName := aws.String(r.sqsConfig.EmailVerificationQueueName)
+	awsAccountId := aws.String(r.sqsConfig.AwsAccountId)
+
+	var queueUrlOutput *sqs.GetQueueUrlOutput
+	queueUrlOutput, err = r.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+		QueueName:              queueName,
+		QueueOwnerAWSAccountId: awsAccountId,
+	})
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while getting queue url",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
+		}
+	}
+
+	queueUrl := queueUrlOutput.QueueUrl
+	_, err = r.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+		QueueUrl:     queueUrl,
+		DelaySeconds: 10,
+		MessageBody:  aws.String(string(messageBodyBytes)),
+		MessageAttributes: map[string]sqsTypes.MessageAttributeValue{
+			"From": {
+				DataType:    aws.String("String"),
+				StringValue: aws.String("UserAPI"),
+			},
+			"To": {
+				DataType:    aws.String("String"),
+				StringValue: aws.String("EmailAPI"),
+			},
+		},
+	})
+	if err != nil {
+		return &cerror.CustomError{
+			HttpStatusCode: http.StatusInternalServerError,
+			LogMessage:     "error occurred while send message to email queue",
+			LogSeverity:    zap.ErrorLevel,
+			LogFields: []zap.Field{
+				zap.Error(err),
+			},
 		}
 	}
 

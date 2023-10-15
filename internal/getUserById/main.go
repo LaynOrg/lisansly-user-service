@@ -38,7 +38,7 @@ func main() {
 	}
 
 	dynamodbClient := dynamodb.NewFromConfig(cfg)
-	repository := user.NewRepository(dynamodbClient, dynamoDbConfig)
+	repository := user.NewRepository(dynamodbClient, dynamoDbConfig, nil, nil)
 	handler := user.NewHandler(
 		nil,
 		repository,

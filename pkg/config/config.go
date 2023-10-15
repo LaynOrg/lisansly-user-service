@@ -49,3 +49,20 @@ func ReadJwtConfig() (*JwtConfig, error) {
 		PublicKey:  []byte(publicKey),
 	}, nil
 }
+
+func ReadSqsConfig() (*SQSConfig, error) {
+	awsAccountId := os.Getenv(AwsAccountId)
+	if awsAccountId == "" {
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, AwsAccountId)
+	}
+
+	emailQueueName := os.Getenv(SQSEmailVerificationQueueName)
+	if emailQueueName == "" {
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, SQSEmailVerificationQueueName)
+	}
+
+	return &SQSConfig{
+		AwsAccountId:               awsAccountId,
+		EmailVerificationQueueName: emailQueueName,
+	}, nil
+}

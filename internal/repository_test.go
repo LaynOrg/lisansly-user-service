@@ -5,6 +5,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"net/http"
 	"testing"
 	"time"
@@ -24,14 +25,17 @@ import (
 )
 
 const (
-	TestAwsRegion                        = "us-west-1"
-	TestDynamoDbUserTable                = "user"
-	TestDynamoDbUserUniquenessTable      = "user-uniqueness"
-	TestDynamoDbRefreshTokenHistoryTable = "refresh-token-history"
+	TestAwsRegion                         = "us-west-1"
+	TestDynamoDbUserTable                 = "user"
+	TestDynamoDbUserUniquenessTable       = "user-uniqueness"
+	TestDynamoDbRefreshTokenHistoryTable  = "refresh-token-history"
+	TestDynamoDbIdentityVerificationTable = "identity-verification-history"
+	TestEmailVerificationQueueName        = "email-verification"
+	TestAwsAccountId                      = "000000000000"
 )
 
 func TestNewRepository(t *testing.T) {
-	repository := NewRepository(nil, nil)
+	repository := NewRepository(nil, nil, nil, nil)
 
 	assert.Implements(t, (*Repository)(nil), repository)
 }
@@ -40,7 +44,7 @@ func TestRepository_InsertUser(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
 
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 
 		createUserTable(t, ctx, dynamodbClient)
@@ -54,6 +58,7 @@ func TestRepository_InsertUser(t *testing.T) {
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
 			},
+			nil, nil,
 		)
 
 		cerr := userRepository.InsertUser(ctx, &Table{
@@ -67,7 +72,7 @@ func TestRepository_InsertUser(t *testing.T) {
 
 	t.Run("when user already exist in table should return error", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 
 		createUserTable(t, ctx, dynamodbClient)
@@ -85,7 +90,7 @@ func TestRepository_InsertUser(t *testing.T) {
 
 		fakeUserUniquenessItem, err := attributevalue.MarshalMap(&UniquenessTable{
 			Unique: TestEmail,
-			Type:   UniquenessEmail,
+			Type:   IdentityEmail,
 		})
 		require.NoError(t, err)
 
@@ -115,6 +120,7 @@ func TestRepository_InsertUser(t *testing.T) {
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
 			},
+			nil, nil,
 		)
 
 		cerr := userRepository.InsertUser(ctx, &Table{
@@ -132,7 +138,7 @@ func TestRepository_InsertUser(t *testing.T) {
 
 	t.Run("when error occurred insert user item to table should return error", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 
 		userRepository := NewRepository(
@@ -143,6 +149,7 @@ func TestRepository_InsertUser(t *testing.T) {
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
 			},
+			nil, nil,
 		)
 
 		cerr := userRepository.InsertUser(ctx, &Table{
@@ -162,7 +169,7 @@ func TestRepository_InsertUser(t *testing.T) {
 func TestRepository_FindUserWithId(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createUserTable(t, ctx, dynamodbClient)
 
@@ -189,7 +196,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
-		})
+		}, nil, nil)
 		user, err := repository.FindUserWithId(
 			ctx,
 			TestUserId,
@@ -221,7 +228,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
-		})
+		}, nil, nil)
 		user, cerr := repository.FindUserWithId(
 			ctx,
 			TestUserId,
@@ -237,7 +244,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 
 	t.Run("when user not found in table should return error", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createUserTable(t, ctx, dynamodbClient)
 
@@ -245,7 +252,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
-		})
+		}, nil, nil)
 		user, cerr := repository.FindUserWithId(
 			ctx,
 			TestUserId,
@@ -263,7 +270,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 func TestRepository_FindUserWithEmail(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createUserTable(t, ctx, dynamodbClient)
 
@@ -290,7 +297,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
-		})
+		}, nil, nil)
 		user, err := repository.FindUserWithEmail(
 			ctx,
 			TestEmail,
@@ -322,7 +329,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
-		})
+		}, nil, nil)
 		user, cerr := repository.FindUserWithEmail(
 			ctx,
 			TestEmail,
@@ -338,7 +345,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 
 	t.Run("when user not found should return error", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createUserTable(t, ctx, dynamodbClient)
 
@@ -346,7 +353,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbUserTable: TestDynamoDbUserTable,
 			},
-		})
+		}, nil, nil)
 		user, cerr := repository.FindUserWithEmail(
 			ctx,
 			TestEmail,
@@ -364,7 +371,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
@@ -374,8 +381,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 				Tables: map[string]string{
 					config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 				},
-			},
-		)
+			}, nil, nil)
 
 		err := userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 			Id:        "abcd-abcd-abcd-abcd",
@@ -404,8 +410,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 				Tables: map[string]string{
 					config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 				},
-			},
-		)
+			}, nil, nil)
 
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 			Id:        "abcd-abcd-abcd-abcd",
@@ -421,7 +426,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
@@ -446,7 +451,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
-		})
+		}, nil, nil)
 		user, cerr := repository.FindRefreshTokenWithUserId(
 			ctx,
 			TestUserId,
@@ -476,7 +481,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
-		})
+		}, nil, nil)
 		user, cerr := repository.FindRefreshTokenWithUserId(
 			ctx,
 			TestUserId,
@@ -492,7 +497,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 
 	t.Run("when refresh token not found should return error", func(t *testing.T) {
 		ctx := context.Background()
-		container, dynamodbClient := createAwsClient(t, ctx)
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
@@ -500,7 +505,7 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 			Tables: map[string]string{
 				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
-		})
+		}, nil, nil)
 		user, cerr := repository.FindRefreshTokenWithUserId(
 			ctx,
 			TestUserId,
@@ -519,7 +524,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		t.Run("with email", func(t *testing.T) {
 			ctx := context.Background()
-			container, dynamodbClient := createAwsClient(t, ctx)
+			container, dynamodbClient := createDynamoDbClient(t, ctx)
 			defer container.Terminate(ctx)
 			createUserTable(t, ctx, dynamodbClient)
 			createUserUniquenessTable(t, ctx, dynamodbClient)
@@ -536,7 +541,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 			fakeUserUniquenessItem, err := attributevalue.MarshalMap(&UniquenessTable{
 				Unique: TestEmail,
-				Type:   UniquenessEmail,
+				Type:   IdentityEmail,
 			})
 			require.NoError(t, err)
 
@@ -563,7 +568,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 					config.DynamoDbUserTable:           TestDynamoDbUserTable,
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
-			})
+			}, nil, nil)
 
 			cerr := repository.UpdateUserById(
 				ctx,
@@ -580,7 +585,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		t.Run("without email", func(t *testing.T) {
 			ctx := context.Background()
-			container, dynamodbClient := createAwsClient(t, ctx)
+			container, dynamodbClient := createDynamoDbClient(t, ctx)
 			defer container.Terminate(ctx)
 			createUserTable(t, ctx, dynamodbClient)
 			createUserUniquenessTable(t, ctx, dynamodbClient)
@@ -597,7 +602,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 			fakeUserUniquenessItem, err := attributevalue.MarshalMap(&UniquenessTable{
 				Unique: TestEmail,
-				Type:   UniquenessEmail,
+				Type:   IdentityEmail,
 			})
 			require.NoError(t, err)
 
@@ -624,7 +629,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 					config.DynamoDbUserTable:           TestDynamoDbUserTable,
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
-			})
+			}, nil, nil)
 
 			cerr := repository.UpdateUserById(
 				ctx,
@@ -656,7 +661,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 					config.DynamoDbUserTable:           TestDynamoDbUserTable,
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
-			})
+			}, nil, nil)
 
 			cerr := repository.UpdateUserById(
 				ctx,
@@ -677,7 +682,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		t.Run("when user not found should return error", func(t *testing.T) {
 			ctx := context.Background()
-			container, dynamodbClient := createAwsClient(t, ctx)
+			container, dynamodbClient := createDynamoDbClient(t, ctx)
 			defer container.Terminate(ctx)
 			createUserTable(t, ctx, dynamodbClient)
 
@@ -686,7 +691,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 					config.DynamoDbUserTable:           TestDynamoDbUserTable,
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
-			})
+			}, nil, nil)
 
 			cerr := repository.UpdateUserById(
 				ctx,
@@ -707,7 +712,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 
 		t.Run("when error occurred while update user should return error", func(t *testing.T) {
 			ctx := context.Background()
-			container, dynamodbClient := createAwsClient(t, ctx)
+			container, dynamodbClient := createDynamoDbClient(t, ctx)
 			defer container.Terminate(ctx)
 			createUserTable(t, ctx, dynamodbClient)
 
@@ -732,7 +737,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 					config.DynamoDbUserTable:           TestDynamoDbUserTable,
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
-			})
+			}, nil, nil)
 
 			cerr := repository.UpdateUserById(
 				ctx,
@@ -769,7 +774,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 					config.DynamoDbUserTable:           TestDynamoDbUserTable,
 					config.DynamoDbUserUniquenessTable: TestDynamoDbUserUniquenessTable,
 				},
-			})
+			}, nil, nil)
 
 			cerr := repository.UpdateUserById(
 				ctx,
@@ -789,6 +794,156 @@ func TestRepository_UpdateUserById(t *testing.T) {
 	})
 }
 
+func TestRepository_InsertIdentityVerificationHistory(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		ctx := context.Background()
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
+		defer container.Terminate(ctx)
+		createIdentityVerificationTable(t, ctx, dynamodbClient)
+
+		userRepository := NewRepository(
+			dynamodbClient,
+			&config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbIdentityVerificationHistoryTable: TestDynamoDbIdentityVerificationTable,
+				},
+			}, nil, nil)
+
+		err := userRepository.InsertIdentityVerificationHistory(ctx, &IdentityVerificationTable{
+			Id:        "abcd-abcd-abcd-abcd",
+			UserID:    "abcd-abcd-abcd-abcd",
+			Type:      IdentityEmail,
+			Code:      "abcd.abcd.abcd",
+			ExpiresAt: time.Now().UTC(),
+		})
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("when error occurred insert identity verification history should return error", func(t *testing.T) {
+		ctx := context.Background()
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
+		defer container.Terminate(ctx)
+
+		userRepository := NewRepository(
+			dynamodbClient,
+			&config.DynamoDbConfig{
+				Tables: map[string]string{
+					config.DynamoDbIdentityVerificationHistoryTable: TestDynamoDbIdentityVerificationTable,
+				},
+			}, nil, nil)
+
+		err := userRepository.InsertIdentityVerificationHistory(ctx, &IdentityVerificationTable{
+			Id:        "abcd-abcd-abcd-abcd",
+			UserID:    "abcd-abcd-abcd-abcd",
+			Type:      IdentityEmail,
+			Code:      "abcd.abcd.abcd",
+			ExpiresAt: time.Now().UTC(),
+		})
+
+		assert.NotNil(t, err)
+	})
+}
+
+func TestRepository_SendEmailVerificationMessage(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		ctx := context.Background()
+		container, sqsClient := createSqsClient(t, ctx)
+		defer container.Terminate(ctx)
+		createEmailVerificationQueueName(t, ctx, sqsClient)
+
+		userRepository := NewRepository(nil, nil,
+			sqsClient, &config.SQSConfig{
+				AwsAccountId:               TestAwsAccountId,
+				EmailVerificationQueueName: TestEmailVerificationQueueName,
+			},
+		)
+		err := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
+			Email:            TestEmail,
+			VerificationCode: "abcd-abcd-abcd-abcd",
+		})
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("when error occurred while getting sqs url should return error", func(t *testing.T) {
+		ctx := context.Background()
+		container, sqsClient := createSqsClient(t, ctx)
+		defer container.Terminate(ctx)
+		createEmailVerificationQueueName(t, ctx, sqsClient)
+
+		userRepository := NewRepository(nil, nil,
+			sqsClient, &config.SQSConfig{
+				AwsAccountId:               "",
+				EmailVerificationQueueName: "",
+			},
+		)
+		err := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
+			Email:            TestEmail,
+			VerificationCode: "abcd-abcd-abcd-abcd",
+		})
+
+		assert.NotNil(t, err)
+		assert.Equal(t,
+			http.StatusInternalServerError,
+			err.HttpStatusCode,
+		)
+	})
+
+	t.Run("when error occurred while send message to queue should return error", func(t *testing.T) {
+		ctx := context.Background()
+		container, sqsClient := createSqsClient(t, ctx)
+		defer container.Terminate(ctx)
+
+		userRepository := NewRepository(nil, nil,
+			sqsClient, &config.SQSConfig{
+				AwsAccountId:               TestAwsAccountId,
+				EmailVerificationQueueName: TestEmailVerificationQueueName,
+			},
+		)
+		err := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
+			Email:            TestEmail,
+			VerificationCode: "abcd-abcd-abcd-abcd",
+		})
+
+		assert.NotNil(t, err)
+		assert.Equal(t,
+			http.StatusInternalServerError,
+			err.HttpStatusCode,
+		)
+	})
+}
+
+func createEmailVerificationQueueName(t *testing.T, ctx context.Context, sqsClient *sqs.Client) {
+	_, err := sqsClient.CreateQueue(ctx, &sqs.CreateQueueInput{
+		QueueName: aws.String(TestEmailVerificationQueueName),
+	})
+	require.NoError(t, err)
+}
+
+func createIdentityVerificationTable(t *testing.T, ctx context.Context, dynamodbClient *dynamodb.Client) {
+	_, err := dynamodbClient.CreateTable(ctx, &dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{
+			{
+				AttributeName: aws.String("id"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+		},
+		KeySchema: []types.KeySchemaElement{
+			{
+				AttributeName: aws.String("id"),
+				KeyType:       types.KeyTypeHash,
+			},
+		},
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(1),
+			WriteCapacityUnits: aws.Int64(1),
+		},
+		TableName: aws.String(TestDynamoDbIdentityVerificationTable),
+	})
+	require.NoError(t, err)
+}
+
 func createRefreshTokenHistoryTable(t *testing.T, ctx context.Context, dynamodbClient *dynamodb.Client) {
 	_, err := dynamodbClient.CreateTable(ctx, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
@@ -804,8 +959,8 @@ func createRefreshTokenHistoryTable(t *testing.T, ctx context.Context, dynamodbC
 			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(5),
-			WriteCapacityUnits: aws.Int64(5),
+			ReadCapacityUnits:  aws.Int64(1),
+			WriteCapacityUnits: aws.Int64(1),
 		},
 		TableName: aws.String(TestDynamoDbRefreshTokenHistoryTable),
 	})
@@ -827,8 +982,8 @@ func createUserTable(t *testing.T, ctx context.Context, dynamodbClient *dynamodb
 			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(5),
-			WriteCapacityUnits: aws.Int64(5),
+			ReadCapacityUnits:  aws.Int64(1),
+			WriteCapacityUnits: aws.Int64(1),
 		},
 		TableName: aws.String(TestDynamoDbUserTable),
 	})
@@ -850,22 +1005,25 @@ func createUserUniquenessTable(t *testing.T, ctx context.Context, dynamodbClient
 			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(5),
-			WriteCapacityUnits: aws.Int64(5),
+			ReadCapacityUnits:  aws.Int64(1),
+			WriteCapacityUnits: aws.Int64(1),
 		},
 		TableName: aws.String(TestDynamoDbUserUniquenessTable),
 	})
 	require.NoError(t, err)
 }
 
-func createAwsClient(t *testing.T, ctx context.Context) (testcontainers.Container, *dynamodb.Client) {
+func createDynamoDbClient(t *testing.T, ctx context.Context) (testcontainers.Container, *dynamodb.Client) {
 	container, err := testcontainers.GenericContainer(
 		ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "localstack/localstack",
 				ExposedPorts: []string{"4566/tcp"},
-				WaitingFor:   wait.NewHostPortStrategy("4566"),
+				Env: map[string]string{
+					"SERVICES": "dynamodb",
+				},
+				WaitingFor: wait.NewHostPortStrategy("4566"),
 			},
 			Started: true,
 		},
@@ -903,4 +1061,54 @@ func createAwsClient(t *testing.T, ctx context.Context) (testcontainers.Containe
 	require.NoError(t, err)
 
 	return container, dynamodb.NewFromConfig(cfg)
+}
+
+func createSqsClient(t *testing.T, ctx context.Context) (testcontainers.Container, *sqs.Client) {
+	container, err := testcontainers.GenericContainer(
+		ctx,
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Image:        "localstack/localstack",
+				ExposedPorts: []string{"4566/tcp"},
+				Env: map[string]string{
+					"SERVICES": "sqs",
+				},
+				WaitingFor: wait.NewHostPortStrategy("4566"),
+			},
+			Started: true,
+		},
+	)
+	require.NoError(t, err)
+
+	ip, err := container.Host(ctx)
+	require.NoError(t, err)
+
+	port, err := container.MappedPort(ctx, "4566")
+	require.NoError(t, err)
+
+	cfg, err := awsCfg.LoadDefaultConfig(
+		ctx,
+		awsCfg.WithEndpointResolverWithOptions(
+			aws.EndpointResolverWithOptionsFunc(
+				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+					return aws.Endpoint{
+						SigningName:   "aws",
+						URL:           fmt.Sprintf("http://%s:%s", ip, port.Port()),
+						SigningRegion: TestAwsRegion,
+					}, nil
+				},
+			),
+		),
+		awsCfg.WithRegion(TestAwsRegion),
+		awsCfg.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
+				"AKID",
+				"SECRET_KEY",
+				"TOKEN",
+			),
+		),
+	)
+	require.NoError(t, err)
+
+	return container, sqs.NewFromConfig(cfg)
 }

@@ -36,17 +36,17 @@ type Service interface {
 }
 
 type service struct {
-	userRepository Repository
-	jwtGenerator   jwt_generator.JwtGenerator
+	repository   Repository
+	jwtGenerator jwt_generator.JwtGenerator
 }
 
 func NewService(
-	userRepository Repository,
+	repository Repository,
 	jwtGenerator jwt_generator.JwtGenerator,
 ) Service {
 	return &service{
-		userRepository: userRepository,
-		jwtGenerator:   jwtGenerator,
+		repository:   repository,
+		jwtGenerator: jwtGenerator,
 	}
 }
 
@@ -67,7 +67,7 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	userId := uuid.NewString()
-	customError := s.userRepository.InsertUser(ctx, &Table{
+	customError := s.repository.InsertUser(ctx, &Table{
 		Id:        userId,
 		Name:      user.Name,
 		Email:     user.Email,
@@ -102,11 +102,33 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	refreshTokenId := uuid.NewString()
-	customError = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+	customError = s.repository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 		Id:        refreshTokenId,
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
 		UserID:    userId,
+	})
+	if customError != nil {
+		return nil, customError
+	}
+
+	identityVerificationHistoryId := uuid.NewString()
+	verificationCode := uuid.NewString()
+	identityVerificationExpiresAt := time.Now().UTC().Add(3 * time.Hour)
+	customError = s.repository.InsertIdentityVerificationHistory(ctx, &IdentityVerificationTable{
+		Id:        identityVerificationHistoryId,
+		UserID:    userId,
+		Type:      IdentityEmail,
+		Code:      verificationCode,
+		ExpiresAt: identityVerificationExpiresAt,
+	})
+	if customError != nil {
+		return nil, customError
+	}
+
+	customError = s.repository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
+		Email:            user.Email,
+		VerificationCode: verificationCode,
 	})
 	if customError != nil {
 		return nil, customError
@@ -125,7 +147,7 @@ func (s *service) Login(
 	*jwt_generator.Tokens,
 	*cerror.CustomError,
 ) {
-	user, customError := s.userRepository.FindUserWithEmail(ctx, claimedUser.Email)
+	user, customError := s.repository.FindUserWithEmail(ctx, claimedUser.Email)
 	if customError != nil {
 		statusCode := customError.HttpStatusCode
 		if statusCode == http.StatusNotFound {
@@ -169,7 +191,7 @@ func (s *service) Login(
 		return nil, customError
 	}
 
-	customError = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+	customError = s.repository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 		Id:        uuid.New().String(),
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
@@ -190,7 +212,7 @@ func (s *service) UpdateUserById(
 	userId string,
 	updateUser *UpdateUserPayload,
 ) (*jwt_generator.Tokens, *cerror.CustomError) {
-	user, customError := s.userRepository.FindUserWithId(ctx, userId)
+	user, customError := s.repository.FindUserWithId(ctx, userId)
 	if customError != nil {
 		return nil, customError
 	}
@@ -227,7 +249,7 @@ func (s *service) UpdateUserById(
 		updateUser.Password = string(hashedPassword)
 	}
 
-	customError = s.userRepository.UpdateUserById(ctx, userId, updateUser)
+	customError = s.repository.UpdateUserById(ctx, userId, updateUser)
 	if customError != nil {
 		return nil, customError
 	}
@@ -258,7 +280,7 @@ func (s *service) UpdateUserById(
 		return nil, cerr
 	}
 
-	customError = s.userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
+	customError = s.repository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
 		Id:        uuid.New().String(),
 		UserID:    userId,
 		Token:     refreshToken,
@@ -282,7 +304,7 @@ func (s *service) GetAccessTokenByRefreshToken(
 	*AccessTokenPayload,
 	*cerror.CustomError,
 ) {
-	refreshTokenDocument, customError := s.userRepository.FindRefreshTokenWithUserId(ctx, userId)
+	refreshTokenDocument, customError := s.repository.FindRefreshTokenWithUserId(ctx, userId)
 	if customError != nil {
 		return nil, customError
 	}
@@ -306,7 +328,7 @@ func (s *service) GetAccessTokenByRefreshToken(
 	}
 
 	var user *Table
-	user, customError = s.userRepository.FindUserWithId(ctx, userId)
+	user, customError = s.repository.FindUserWithId(ctx, userId)
 	if customError != nil {
 		return nil, customError
 	}
