@@ -1,11 +1,11 @@
-service: UserAPI
+service: UserService
 frameworkVersion: "3"
 
 provider:
   name: aws
   runtime: provided.al2
   architecture: arm64
-  region: us-west-1
+  region: ${file(config.${opt:stage, self:provider.stage}.json):region}
   environment: ${file(env.${opt:stage, self:provider.stage}.json)}
   iam:
     role:
