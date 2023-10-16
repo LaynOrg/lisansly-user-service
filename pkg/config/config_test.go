@@ -13,13 +13,19 @@ import (
 
 func TestReadDynamoDbConfig(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		err := os.Setenv(DynamoDbUserTable, "database-user-collection")
+		err := os.Setenv(DynamoDbUserTable, "database-user-table")
 		require.NoError(t, err)
 
 		err = os.Setenv(DynamoDbUserUniquenessTable, "user-uniqueness-table")
 		require.NoError(t, err)
 
-		err = os.Setenv(DynamoDbRefreshTokenHistoryTable, "database-refresh-token-collection")
+		err = os.Setenv(DynamoDbRefreshTokenHistoryTable, "database-refresh-token-history-table")
+		require.NoError(t, err)
+
+		err = os.Setenv(
+			DynamoDbIdentityVerificationHistoryTable,
+			"database-identity-verification-history-table",
+		)
 		require.NoError(t, err)
 
 		defer os.Clearenv()
@@ -34,6 +40,20 @@ func TestReadDynamoDbConfig(t *testing.T) {
 		config, err := ReadDynamoDbConfig()
 
 		assert.Equal(t, err, fmt.Errorf(EnvironmentVariableNotDefined, DynamoDbUserTable))
+		assert.Empty(t, config)
+	})
+
+	t.Run("empty user uniqueness table", func(t *testing.T) {
+		var err error
+
+		err = os.Setenv(DynamoDbUserTable, "user-table")
+		require.NoError(t, err)
+
+		defer os.Clearenv()
+
+		config, err := ReadDynamoDbConfig()
+
+		assert.Equal(t, err, fmt.Errorf(EnvironmentVariableNotDefined, DynamoDbUserUniquenessTable))
 		assert.Empty(t, config)
 	})
 
@@ -54,17 +74,23 @@ func TestReadDynamoDbConfig(t *testing.T) {
 		assert.Empty(t, config)
 	})
 
-	t.Run("empty user uniqueness table", func(t *testing.T) {
+	t.Run("empty identity verification history table", func(t *testing.T) {
 		var err error
 
 		err = os.Setenv(DynamoDbUserTable, "user-table")
+		require.NoError(t, err)
+
+		err = os.Setenv(DynamoDbUserUniquenessTable, "user-uniqueness-table")
+		require.NoError(t, err)
+
+		err = os.Setenv(DynamoDbRefreshTokenHistoryTable, "database-refresh-token-history-table")
 		require.NoError(t, err)
 
 		defer os.Clearenv()
 
 		config, err := ReadDynamoDbConfig()
 
-		assert.Equal(t, err, fmt.Errorf(EnvironmentVariableNotDefined, DynamoDbUserUniquenessTable))
+		assert.Equal(t, err, fmt.Errorf(EnvironmentVariableNotDefined, DynamoDbIdentityVerificationHistoryTable))
 		assert.Empty(t, config)
 	})
 }
@@ -118,7 +144,7 @@ func TestReadSqsConfig(t *testing.T) {
 		err = os.Setenv(AwsAccountId, "aws-account-id")
 		require.NoError(t, err)
 
-		err = os.Setenv(SQSEmailVerificationQueueName, "email-verification-queue-name")
+		err = os.Setenv(SQSEmailVerificationQueueUrl, "email-verification-queue-url")
 		require.NoError(t, err)
 
 		defer os.Clearenv()
@@ -136,7 +162,7 @@ func TestReadSqsConfig(t *testing.T) {
 		assert.Empty(t, sqsConfig)
 	})
 
-	t.Run("empty sqs email verification queue name", func(t *testing.T) {
+	t.Run("empty sqs email verification queue url", func(t *testing.T) {
 		var err error
 
 		err = os.Setenv(AwsAccountId, "aws-account-id")

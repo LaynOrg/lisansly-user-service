@@ -9,8 +9,8 @@ const (
 	DynamoDbRefreshTokenHistoryTable         = "DYNAMODB_REFRESH_TOKEN_HISTORY_TABLE"
 	DynamoDbIdentityVerificationHistoryTable = "DYNAMODB_IDENTITY_VERIFICATION_HISTORY_TABLE"
 
-	AwsAccountId                  string = "AWS_ACCOUNT_ID"
-	SQSEmailVerificationQueueName string = "SQS_EMAIL_VERIFICATION_QUEUE_NAME"
+	AwsAccountId                 string = "AWS_ACCOUNT_ID"
+	SQSEmailVerificationQueueUrl string = "SQS_EMAIL_VERIFICATION_QUEUE_URL"
 
 	JwtPrivateKey = "JWT_PRIVATE_KEY"
 	JwtPublicKey  = "JWT_PUBLIC_KEY"
@@ -21,8 +21,8 @@ type DynamoDbConfig struct {
 }
 
 type SQSConfig struct {
-	AwsAccountId               string
-	EmailVerificationQueueName string
+	AwsAccountId              string
+	EmailVerificationQueueUrl *string
 }
 
 type JwtConfig struct {

@@ -578,26 +578,7 @@ func (r *repository) SendEmailVerificationMessage(
 		}
 	}
 
-	queueName := aws.String(r.sqsConfig.EmailVerificationQueueName)
-	awsAccountId := aws.String(r.sqsConfig.AwsAccountId)
-
-	var queueUrlOutput *sqs.GetQueueUrlOutput
-	queueUrlOutput, err = r.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
-		QueueName:              queueName,
-		QueueOwnerAWSAccountId: awsAccountId,
-	})
-	if err != nil {
-		return &cerror.CustomError{
-			HttpStatusCode: http.StatusInternalServerError,
-			LogMessage:     "error occurred while getting queue url",
-			LogSeverity:    zap.ErrorLevel,
-			LogFields: []zap.Field{
-				zap.Error(err),
-			},
-		}
-	}
-
-	queueUrl := queueUrlOutput.QueueUrl
+	queueUrl := r.sqsConfig.EmailVerificationQueueUrl
 	_, err = r.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:     queueUrl,
 		DelaySeconds: 10,

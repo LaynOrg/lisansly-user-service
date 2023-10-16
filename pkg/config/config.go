@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
 func ReadDynamoDbConfig() (*DynamoDbConfig, error) {
@@ -22,11 +24,17 @@ func ReadDynamoDbConfig() (*DynamoDbConfig, error) {
 		return nil, fmt.Errorf(EnvironmentVariableNotDefined, DynamoDbRefreshTokenHistoryTable)
 	}
 
+	identityVerificationHistoryTable := os.Getenv(DynamoDbIdentityVerificationHistoryTable)
+	if identityVerificationHistoryTable == "" {
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, DynamoDbIdentityVerificationHistoryTable)
+	}
+
 	return &DynamoDbConfig{
 		Tables: map[string]string{
-			DynamoDbUserTable:                userTable,
-			DynamoDbUserUniquenessTable:      userUniquenessTable,
-			DynamoDbRefreshTokenHistoryTable: refreshTokenHistoryTable,
+			DynamoDbUserTable:                        userTable,
+			DynamoDbUserUniquenessTable:              userUniquenessTable,
+			DynamoDbRefreshTokenHistoryTable:         refreshTokenHistoryTable,
+			DynamoDbIdentityVerificationHistoryTable: identityVerificationHistoryTable,
 		},
 	}, nil
 }
@@ -56,13 +64,13 @@ func ReadSqsConfig() (*SQSConfig, error) {
 		return nil, fmt.Errorf(EnvironmentVariableNotDefined, AwsAccountId)
 	}
 
-	emailQueueName := os.Getenv(SQSEmailVerificationQueueName)
-	if emailQueueName == "" {
-		return nil, fmt.Errorf(EnvironmentVariableNotDefined, SQSEmailVerificationQueueName)
+	emailVerificationQueueUrl := os.Getenv(SQSEmailVerificationQueueUrl)
+	if emailVerificationQueueUrl == "" {
+		return nil, fmt.Errorf(EnvironmentVariableNotDefined, SQSEmailVerificationQueueUrl)
 	}
 
 	return &SQSConfig{
-		AwsAccountId:               awsAccountId,
-		EmailVerificationQueueName: emailQueueName,
+		AwsAccountId:              awsAccountId,
+		EmailVerificationQueueUrl: aws.String(emailVerificationQueueUrl),
 	}, nil
 }

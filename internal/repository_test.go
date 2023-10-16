@@ -852,42 +852,24 @@ func TestRepository_SendEmailVerificationMessage(t *testing.T) {
 		defer container.Terminate(ctx)
 		createEmailVerificationQueueName(t, ctx, sqsClient)
 
+		getQueueUrl, err := sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+			QueueName:              aws.String(TestEmailVerificationQueueName),
+			QueueOwnerAWSAccountId: aws.String(TestAwsAccountId),
+		})
+		require.NoError(t, err)
+
 		userRepository := NewRepository(nil, nil,
 			sqsClient, &config.SQSConfig{
-				AwsAccountId:               TestAwsAccountId,
-				EmailVerificationQueueName: TestEmailVerificationQueueName,
+				AwsAccountId:              TestAwsAccountId,
+				EmailVerificationQueueUrl: getQueueUrl.QueueUrl,
 			},
 		)
-		err := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
+		cerr := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
 			Email:            TestEmail,
 			VerificationCode: "abcd-abcd-abcd-abcd",
 		})
 
-		assert.Nil(t, err)
-	})
-
-	t.Run("when error occurred while getting sqs url should return error", func(t *testing.T) {
-		ctx := context.Background()
-		container, sqsClient := createSqsClient(t, ctx)
-		defer container.Terminate(ctx)
-		createEmailVerificationQueueName(t, ctx, sqsClient)
-
-		userRepository := NewRepository(nil, nil,
-			sqsClient, &config.SQSConfig{
-				AwsAccountId:               "",
-				EmailVerificationQueueName: "",
-			},
-		)
-		err := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
-			Email:            TestEmail,
-			VerificationCode: "abcd-abcd-abcd-abcd",
-		})
-
-		assert.NotNil(t, err)
-		assert.Equal(t,
-			http.StatusInternalServerError,
-			err.HttpStatusCode,
-		)
+		assert.Nil(t, cerr)
 	})
 
 	t.Run("when error occurred while send message to queue should return error", func(t *testing.T) {
@@ -897,19 +879,19 @@ func TestRepository_SendEmailVerificationMessage(t *testing.T) {
 
 		userRepository := NewRepository(nil, nil,
 			sqsClient, &config.SQSConfig{
-				AwsAccountId:               TestAwsAccountId,
-				EmailVerificationQueueName: TestEmailVerificationQueueName,
+				AwsAccountId:              TestAwsAccountId,
+				EmailVerificationQueueUrl: aws.String(""),
 			},
 		)
-		err := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
+		cerr := userRepository.SendEmailVerificationMessage(ctx, &EmailVerificationSqsMessageBody{
 			Email:            TestEmail,
 			VerificationCode: "abcd-abcd-abcd-abcd",
 		})
 
-		assert.NotNil(t, err)
+		assert.NotNil(t, cerr)
 		assert.Equal(t,
 			http.StatusInternalServerError,
-			err.HttpStatusCode,
+			cerr.HttpStatusCode,
 		)
 	})
 }
