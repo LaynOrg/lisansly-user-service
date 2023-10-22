@@ -1,4 +1,4 @@
-module user-api
+module user-service
 
 go 1.21
 

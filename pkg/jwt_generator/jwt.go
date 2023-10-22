@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 
-	"user-api/pkg/config"
+	"user-service/pkg/config"
 )
 
 type JwtGenerator interface {

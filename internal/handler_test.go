@@ -15,8 +15,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	"user-api/pkg/cerror"
-	"user-api/pkg/jwt_generator"
+	"user-service/pkg/cerror"
+	"user-service/pkg/jwt_generator"
 )
 
 func TestNewHandler(t *testing.T) {

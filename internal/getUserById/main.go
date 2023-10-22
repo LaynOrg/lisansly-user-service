@@ -9,8 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"go.uber.org/zap"
 
-	user "user-api/internal"
-	"user-api/pkg/config"
+	user "user-service/internal"
+	"user-service/pkg/config"
 )
 
 func main() {

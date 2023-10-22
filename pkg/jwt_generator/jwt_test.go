@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"user-api/pkg/config"
+	"user-service/pkg/config"
 )
 
 const (

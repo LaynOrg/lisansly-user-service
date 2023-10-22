@@ -7,9 +7,9 @@ import (
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 
-	"user-api/pkg/cerror"
-	"user-api/pkg/jwt_generator"
-	"user-api/pkg/logger"
+	"user-service/pkg/cerror"
+	"user-service/pkg/jwt_generator"
+	"user-service/pkg/logger"
 )
 
 type Handler interface {

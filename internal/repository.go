@@ -15,8 +15,8 @@ import (
 	"github.com/goccy/go-json"
 	"go.uber.org/zap"
 
-	"user-api/pkg/cerror"
-	"user-api/pkg/config"
+	"user-service/pkg/cerror"
+	"user-service/pkg/config"
 )
 
 type Repository interface {
@@ -586,11 +586,11 @@ func (r *repository) SendEmailVerificationMessage(
 		MessageAttributes: map[string]sqsTypes.MessageAttributeValue{
 			"From": {
 				DataType:    aws.String("String"),
-				StringValue: aws.String("UserAPI"),
+				StringValue: aws.String("UserService"),
 			},
 			"To": {
 				DataType:    aws.String("String"),
-				StringValue: aws.String("EmailAPI"),
+				StringValue: aws.String("EmailService"),
 			},
 		},
 	})

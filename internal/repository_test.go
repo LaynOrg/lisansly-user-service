@@ -21,7 +21,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"user-api/pkg/config"
+	"user-service/pkg/config"
 )
 
 const (

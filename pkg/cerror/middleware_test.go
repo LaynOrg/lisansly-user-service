@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"user-api/pkg/logger"
+	"user-service/pkg/logger"
 )
 
 func TestErrorHandler(t *testing.T) {

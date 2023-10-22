@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
-	"user-api/pkg/cerror"
-	"user-api/pkg/jwt_generator"
+	"user-service/pkg/cerror"
+	"user-service/pkg/jwt_generator"
 )
 
 type Service interface {

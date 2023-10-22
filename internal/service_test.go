@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"user-api/pkg/cerror"
-	"user-api/pkg/config"
-	"user-api/pkg/jwt_generator"
+	"user-service/pkg/cerror"
+	"user-service/pkg/config"
+	"user-service/pkg/jwt_generator"
 )
 
 const (
