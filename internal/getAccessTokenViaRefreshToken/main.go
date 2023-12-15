@@ -18,13 +18,8 @@ func main() {
 	var err error
 
 	logWithProductionConfig, _ := zap.NewProduction()
+	defer logWithProductionConfig.Sync()
 	log := logWithProductionConfig.Sugar()
-	defer func(log *zap.SugaredLogger) {
-		err := log.Sync()
-		if err != nil {
-			panic(err)
-		}
-	}(log)
 
 	var dynamodbConfig *config.DynamoDbConfig
 	dynamodbConfig, err = config.ReadDynamoDbConfig()

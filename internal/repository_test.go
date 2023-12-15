@@ -5,7 +5,6 @@ package user
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"net/http"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -1002,10 +1002,8 @@ func createDynamoDbClient(t *testing.T, ctx context.Context) (testcontainers.Con
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "localstack/localstack",
 				ExposedPorts: []string{"4566/tcp"},
-				Env: map[string]string{
-					"SERVICES": "dynamodb",
-				},
-				WaitingFor: wait.NewHostPortStrategy("4566"),
+				Env:          map[string]string{"SERVICES": "dynamodb"},
+				WaitingFor:   wait.NewHostPortStrategy("4566"),
 			},
 			Started: true,
 		},
@@ -1052,10 +1050,8 @@ func createSqsClient(t *testing.T, ctx context.Context) (testcontainers.Containe
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "localstack/localstack",
 				ExposedPorts: []string{"4566/tcp"},
-				Env: map[string]string{
-					"SERVICES": "sqs",
-				},
-				WaitingFor: wait.NewHostPortStrategy("4566"),
+				Env:          map[string]string{"SERVICES": "sqs"},
+				WaitingFor:   wait.NewHostPortStrategy("4566"),
 			},
 			Started: true,
 		},

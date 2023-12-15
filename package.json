@@ -8,6 +8,6 @@
   "readme": "https://github.com/LaynOrg/lisansly-user-service#readme",
   "license": "MIT",
   "devDependencies": {
-    "serverless": "^3.35.2"
+    "serverless": "^3.38.0"
   }
 }

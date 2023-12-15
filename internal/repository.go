@@ -396,7 +396,7 @@ func (r *repository) UpdateUserById(
 	)
 
 	updateExpression, cerr := r.buildUpdateExpression(updateUserPayload)
-	if err != nil {
+	if cerr != nil {
 		return cerr
 	}
 

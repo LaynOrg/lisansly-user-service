@@ -62,7 +62,7 @@ func (h handler) Register(ctx context.Context, request *RegisterPayload) (*jwt_g
 		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	log.Info(logger.LoggerEventFinished)
+	log.Info(logger.EventFinished)
 	return tokens, nil
 }
 
@@ -88,7 +88,7 @@ func (h handler) Login(ctx context.Context, request *LoginPayload) (*jwt_generat
 		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	log.Info(logger.LoggerEventFinished)
+	log.Info(logger.EventFinished)
 	return tokens, nil
 }
 
@@ -117,7 +117,7 @@ func (h handler) GetUserById(ctx context.Context, request *GetUserByIdPayload) (
 		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	log.Info(logger.LoggerEventFinished)
+	log.Info(logger.EventFinished)
 	return userDocument, nil
 }
 
@@ -151,7 +151,7 @@ func (h handler) UpdateUserById(ctx context.Context, request *UpdateUserPayload)
 		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	log.Info(logger.LoggerEventFinished)
+	log.Info(logger.EventFinished)
 	return tokens, nil
 }
 
@@ -184,6 +184,6 @@ func (h handler) GetAccessTokenViaRefreshToken(
 		return nil, cerror.ErrorHandler(log, cerr)
 	}
 
-	log.Info(logger.LoggerEventFinished)
+	log.Info(logger.EventFinished)
 	return accessToken, nil
 }
