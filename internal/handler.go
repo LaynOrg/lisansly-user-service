@@ -13,10 +13,22 @@ import (
 )
 
 type Handler interface {
-	Register(ctx context.Context, request *RegisterPayload) (*jwt_generator.Tokens, error)
-	Login(ctx context.Context, request *LoginPayload) (*jwt_generator.Tokens, error)
-	GetUserById(ctx context.Context, request *GetUserByIdPayload) (*Table, error)
-	UpdateUserById(ctx context.Context, request *UpdateUserPayload) (*jwt_generator.Tokens, error)
+	Register(
+		ctx context.Context,
+		request *RegisterPayload,
+	) (*jwt_generator.Tokens, error)
+	Login(
+		ctx context.Context,
+		request *LoginPayload,
+	) (*jwt_generator.Tokens, error)
+	GetUserById(
+		ctx context.Context,
+		request *GetUserByIdPayload,
+	) (*Table, error)
+	UpdateUserById(
+		ctx context.Context,
+		request *UpdateUserPayload,
+	) (*jwt_generator.Tokens, error)
 	GetAccessTokenViaRefreshToken(
 		ctx context.Context,
 		request *GetAccessTokenViaRefreshTokenPayload,
@@ -40,7 +52,10 @@ func NewHandler(
 	}
 }
 
-func (h handler) Register(ctx context.Context, request *RegisterPayload) (*jwt_generator.Tokens, error) {
+func (h handler) Register(
+	ctx context.Context,
+	request *RegisterPayload,
+) (*jwt_generator.Tokens, error) {
 	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
@@ -66,7 +81,10 @@ func (h handler) Register(ctx context.Context, request *RegisterPayload) (*jwt_g
 	return tokens, nil
 }
 
-func (h handler) Login(ctx context.Context, request *LoginPayload) (*jwt_generator.Tokens, error) {
+func (h handler) Login(
+	ctx context.Context,
+	request *LoginPayload,
+) (*jwt_generator.Tokens, error) {
 	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
@@ -92,14 +110,17 @@ func (h handler) Login(ctx context.Context, request *LoginPayload) (*jwt_generat
 	return tokens, nil
 }
 
-func (h handler) GetUserById(ctx context.Context, request *GetUserByIdPayload) (*Table, error) {
+func (h handler) GetUserById(
+	ctx context.Context,
+	request *GetUserByIdPayload,
+) (*Table, error) {
 	log := logger.FromContext(ctx)
 	lc, ok := lambdacontext.FromContext(ctx)
 	if ok {
 		log = log.With(zap.String("requestId", lc.AwsRequestID))
 	}
 
-	userId := request.UserId
+	userId := request.Id
 	log = log.With(zap.String("userId", userId))
 	ctx = logger.InjectContext(ctx, log)
 
@@ -121,7 +142,10 @@ func (h handler) GetUserById(ctx context.Context, request *GetUserByIdPayload) (
 	return userDocument, nil
 }
 
-func (h handler) UpdateUserById(ctx context.Context, request *UpdateUserPayload) (*jwt_generator.Tokens, error) {
+func (h handler) UpdateUserById(
+	ctx context.Context,
+	request *UpdateUserPayload,
+) (*jwt_generator.Tokens, error) {
 	log := logger.FromContext(ctx)
 	lambdaContext, ok := lambdacontext.FromContext(ctx)
 	if ok {
@@ -131,7 +155,7 @@ func (h handler) UpdateUserById(ctx context.Context, request *UpdateUserPayload)
 	}
 	ctx = logger.InjectContext(ctx, log)
 
-	userId := request.UserId
+	userId := request.Id
 	log = log.With(
 		zap.String("userId", userId),
 	)

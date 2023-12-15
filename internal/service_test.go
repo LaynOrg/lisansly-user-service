@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -19,7 +20,6 @@ import (
 )
 
 const (
-	TestUserId                    = "abcd-abcd-abcd-abcd-abcd"
 	TestUserName                  = "Lynicis"
 	TestEmail                     = "test@test.com"
 	TestNewEmail                  = "new-email@test.com"
@@ -31,6 +31,7 @@ const (
 )
 
 var (
+	TestUserId     = uuid.NewString()
 	TestPrivateKey = []byte(`
 -----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIPaQZM9NX2H8lG9f+8MZ2eRSlqGsnj2yZMtfBYecCMmpoAoGCCqGSM49
