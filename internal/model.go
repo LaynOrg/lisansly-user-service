@@ -48,7 +48,7 @@ type Table struct {
 	Name      string    `dynamodbav:"name"`
 	Email     string    `dynamodbav:"email"`
 	Password  string    `dynamodbav:"password"`
-	Role      string    `dynamodbav:"role"`
+	Plan      string    `dynamodbav:"plan"`
 	CreatedAt time.Time `dynamodbav:"createdAt"`
 	UpdatedAt time.Time `dynamodbav:"updatedAt"`
 	DeletedAt time.Time `dynamodbav:"deletedAt"`

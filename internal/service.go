@@ -72,7 +72,7 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 		Name:      user.Name,
 		Email:     user.Email,
 		Password:  string(hashedPassword),
-		Role:      PlanDefault,
+		Plan:      PlanDefault,
 		CreatedAt: time.Now().UTC(),
 	})
 	if customError != nil {

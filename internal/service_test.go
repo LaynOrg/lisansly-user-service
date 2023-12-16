@@ -319,7 +319,7 @@ func TestService_Login(t *testing.T) {
 				Name:     TestUserName,
 				Email:    TestEmail,
 				Password: TestCryptPassword,
-				Role:     PlanDefault,
+				Plan:     PlanDefault,
 			}, nil)
 
 		mockUserRepository.
@@ -409,7 +409,7 @@ func TestService_Login(t *testing.T) {
 				Name:     TestUserName,
 				Email:    TestEmail,
 				Password: "different-password",
-				Role:     PlanDefault,
+				Plan:     PlanDefault,
 			}, nil)
 
 		userService := NewService(mockUserRepository, nil)
@@ -438,7 +438,7 @@ func TestService_Login(t *testing.T) {
 				Name:     TestUserName,
 				Email:    TestEmail,
 				Password: TestCryptPassword,
-				Role:     PlanDefault,
+				Plan:     PlanDefault,
 			}, nil)
 
 		mockJwtGenerator.
@@ -472,7 +472,7 @@ func TestService_Login(t *testing.T) {
 				Name:     TestUserName,
 				Email:    TestEmail,
 				Password: TestCryptPassword,
-				Role:     PlanDefault,
+				Plan:     PlanDefault,
 			}, nil)
 
 		mockJwtGenerator.
@@ -509,7 +509,7 @@ func TestService_Login(t *testing.T) {
 				Name:     TestUserName,
 				Email:    TestEmail,
 				Password: TestCryptPassword,
-				Role:     PlanDefault,
+				Plan:     PlanDefault,
 			}, nil)
 
 		mockUserRepository.
@@ -562,7 +562,7 @@ func TestService_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
 				UpdatedAt: time.Now().UTC(),
 			}, nil)
@@ -624,7 +624,7 @@ func TestService_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
 				UpdatedAt: time.Now().UTC(),
 			}, nil)
@@ -660,7 +660,7 @@ func TestService_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
 				UpdatedAt: time.Now().UTC(),
 			}, nil)
@@ -700,7 +700,7 @@ func TestService_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
 				UpdatedAt: time.Now().UTC(),
 			}, nil)
@@ -736,7 +736,7 @@ func TestService_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
 				UpdatedAt: time.Now().UTC(),
 			}, nil)
@@ -775,7 +775,7 @@ func TestService_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
 				UpdatedAt: time.Now().UTC(),
 			}, nil)
@@ -831,7 +831,7 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC(),
 			}, nil)
 
@@ -980,7 +980,7 @@ func TestService_GetAccessTokenByRefreshToken(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC(),
 			}, nil)
 

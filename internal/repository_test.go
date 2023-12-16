@@ -83,7 +83,7 @@ func TestRepository_InsertUser(t *testing.T) {
 			Name:      TestUserName,
 			Email:     TestEmail,
 			Password:  TestPassword,
-			Role:      PlanDefault,
+			Plan:      PlanDefault,
 			CreatedAt: time.Now().UTC(),
 		})
 		require.NoError(t, err)
@@ -179,7 +179,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
-			Role:      PlanDefault,
+			Plan:      PlanDefault,
 			CreatedAt: now,
 		})
 
@@ -207,7 +207,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
-			Role:      PlanDefault,
+			Plan:      PlanDefault,
 			CreatedAt: now,
 		}, user)
 		assert.Nil(t, err)
@@ -280,7 +280,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
-			Role:      PlanDefault,
+			Plan:      PlanDefault,
 			CreatedAt: now,
 		})
 
@@ -308,7 +308,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
-			Role:      PlanDefault,
+			Plan:      PlanDefault,
 			CreatedAt: now,
 		}, user)
 		assert.Nil(t, err)
@@ -534,7 +534,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC(),
 			})
 			require.NoError(t, err)
@@ -595,7 +595,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC(),
 			})
 			require.NoError(t, err)
@@ -721,7 +721,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
-				Role:      PlanDefault,
+				Plan:      PlanDefault,
 				CreatedAt: time.Now().UTC(),
 			})
 			require.NoError(t, err)
