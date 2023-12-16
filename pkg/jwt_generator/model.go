@@ -2,10 +2,10 @@ package jwt_generator
 
 import "github.com/golang-jwt/jwt/v4"
 
-const IssuerDefault = "lisansly"
-
 const (
-	RoleUser = "user"
+	IssuerDefault = "lisansly"
+
+	PlanDefault = "free"
 )
 
 type Claims struct {

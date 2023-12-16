@@ -362,7 +362,7 @@ func TestHandler_GetUserById(t *testing.T) {
 		Name:      "test",
 		Email:     "test@test.com",
 		Password:  "Asdfg12345_",
-		Role:      RoleUser,
+		Role:      PlanDefault,
 		CreatedAt: time.Now().UTC(),
 	}
 

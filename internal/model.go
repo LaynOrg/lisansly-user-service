@@ -3,7 +3,7 @@ package user
 import "time"
 
 const (
-	RoleUser = "user"
+	PlanDefault = "free"
 )
 
 type IdentityType string
