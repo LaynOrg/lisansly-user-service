@@ -254,11 +254,21 @@ func (s *service) UpdateUserById(
 		return nil, customError
 	}
 
+	userName := user.Name
+	if updateUser.Name != "" {
+		userName = updateUser.Name
+	}
+
+	userEmail := user.Email
+	if updateUser.Email != "" {
+		userEmail = updateUser.Email
+	}
+
 	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 	accessToken, err := s.jwtGenerator.GenerateAccessToken(
 		accessTokenExpiresAt,
-		user.Name,
-		user.Email,
+		userName,
+		userEmail,
 		userId,
 	)
 	if err != nil {
@@ -281,7 +291,7 @@ func (s *service) UpdateUserById(
 	}
 
 	customError = s.repository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
-		Id:        uuid.New().String(),
+		Id:        uuid.NewString(),
 		UserID:    userId,
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,

@@ -706,7 +706,7 @@ func TestService_UpdateUserById(t *testing.T) {
 			}, nil)
 		mockJwtGenerator.
 			EXPECT().
-			GenerateAccessToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
+			GenerateAccessToken(gomock.Any(), TestUserName, TestNewEmail, TestUserId).
 			Return("", errors.New("generate access token error"))
 
 		service := NewService(mockUserRepository, mockJwtGenerator)
@@ -742,7 +742,7 @@ func TestService_UpdateUserById(t *testing.T) {
 			}, nil)
 		mockJwtGenerator.
 			EXPECT().
-			GenerateAccessToken(gomock.Any(), TestUserName, TestEmail, TestUserId).
+			GenerateAccessToken(gomock.Any(), TestUserName, TestNewEmail, TestUserId).
 			Return("abcd.abcd.abcd", nil)
 		mockJwtGenerator.
 			EXPECT().
