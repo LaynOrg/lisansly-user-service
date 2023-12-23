@@ -120,7 +120,7 @@ func (h handler) GetUserById(
 		log = log.With(zap.String("requestId", lc.AwsRequestID))
 	}
 
-	userId := request.Id
+	userId := request.ID
 	log = log.With(zap.String("userId", userId))
 	ctx = logger.InjectContext(ctx, log)
 
@@ -155,7 +155,7 @@ func (h handler) UpdateUserById(
 	}
 	ctx = logger.InjectContext(ctx, log)
 
-	userId := request.Id
+	userId := request.ID
 	log = log.With(
 		zap.String("userId", userId),
 	)
@@ -201,7 +201,7 @@ func (h handler) GetAccessTokenViaRefreshToken(
 
 	accessToken, cerr := h.service.GetAccessTokenByRefreshToken(
 		ctx,
-		request.UserId,
+		request.UserID,
 		request.RefreshToken,
 	)
 	if cerr != nil {

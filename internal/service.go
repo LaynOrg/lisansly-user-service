@@ -68,7 +68,7 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 
 	userId := uuid.NewString()
 	customError := s.repository.InsertUser(ctx, &Table{
-		Id:        userId,
+		ID:        userId,
 		Name:      user.Name,
 		Email:     user.Email,
 		Password:  string(hashedPassword),
@@ -80,8 +80,12 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	var accessToken string
-	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, userId)
+	accessToken, err = s.jwtGenerator.GenerateAccessToken(
+		jwt_generator.AccessTokenExpirationDuration,
+		user.Name,
+		user.Email,
+		userId,
+	)
 	if err != nil {
 		customError := cerror.ErrorGenerateAccessToken
 		customError.LogFields = []zap.Field{
@@ -91,8 +95,7 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	var refreshToken string
-	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, userId)
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(jwt_generator.RefreshTokenExpirationDuration, userId)
 	if err != nil {
 		customError := cerror.ErrorGenerateRefreshToken
 		customError.LogFields = []zap.Field{
@@ -102,8 +105,9 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 	}
 
 	refreshTokenId := uuid.NewString()
+	refreshTokenExpiresAt := time.Now().UTC().Add(jwt_generator.RefreshTokenExpirationDuration)
 	customError = s.repository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
-		Id:        refreshTokenId,
+		ID:        refreshTokenId,
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
 		UserID:    userId,
@@ -114,9 +118,9 @@ func (s *service) Register(ctx context.Context, user *RegisterPayload) (*jwt_gen
 
 	identityVerificationHistoryId := uuid.NewString()
 	verificationCode := uuid.NewString()
-	identityVerificationExpiresAt := time.Now().UTC().Add(3 * time.Hour)
+	identityVerificationExpiresAt := time.Now().UTC().Add(jwt_generator.IdentityVerificationExpirationDuration)
 	customError = s.repository.InsertIdentityVerificationHistory(ctx, &IdentityVerificationTable{
-		Id:        identityVerificationHistoryId,
+		ID:        identityVerificationHistoryId,
 		UserID:    userId,
 		Type:      IdentityEmail,
 		Code:      verificationCode,
@@ -170,8 +174,12 @@ func (s *service) Login(
 	}
 
 	var accessToken string
-	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
-	accessToken, err = s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
+	accessToken, err = s.jwtGenerator.GenerateAccessToken(
+		jwt_generator.AccessTokenExpirationDuration,
+		user.Name,
+		user.Email,
+		user.ID,
+	)
 	if err != nil {
 		customError = cerror.ErrorGenerateAccessToken
 		customError.LogFields = []zap.Field{
@@ -181,8 +189,7 @@ func (s *service) Login(
 	}
 
 	var refreshToken string
-	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, user.Id)
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(jwt_generator.RefreshTokenExpirationDuration, user.ID)
 	if err != nil {
 		customError = cerror.ErrorGenerateRefreshToken
 		customError.LogFields = []zap.Field{
@@ -191,11 +198,12 @@ func (s *service) Login(
 		return nil, customError
 	}
 
+	refreshTokenExpiresAt := time.Now().UTC().Add(jwt_generator.RefreshTokenExpirationDuration)
 	customError = s.repository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
-		Id:        uuid.New().String(),
+		ID:        uuid.New().String(),
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
-		UserID:    user.Id,
+		UserID:    user.ID,
 	})
 	if customError != nil {
 		return nil, customError
@@ -264,9 +272,8 @@ func (s *service) UpdateUserById(
 		userEmail = updateUser.Email
 	}
 
-	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 	accessToken, err := s.jwtGenerator.GenerateAccessToken(
-		accessTokenExpiresAt,
+		jwt_generator.AccessTokenExpirationDuration,
 		userName,
 		userEmail,
 		userId,
@@ -280,8 +287,7 @@ func (s *service) UpdateUserById(
 	}
 
 	var refreshToken string
-	refreshTokenExpiresAt := time.Now().UTC().Add(24 * time.Hour)
-	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(refreshTokenExpiresAt, user.Id)
+	refreshToken, err = s.jwtGenerator.GenerateRefreshToken(jwt_generator.RefreshTokenExpirationDuration, user.ID)
 	if err != nil {
 		cerr := cerror.ErrorGenerateRefreshToken
 		cerr.LogFields = []zap.Field{
@@ -290,8 +296,9 @@ func (s *service) UpdateUserById(
 		return nil, cerr
 	}
 
+	refreshTokenExpiresAt := time.Now().UTC().Add(jwt_generator.RefreshTokenExpirationDuration)
 	customError = s.repository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
-		Id:        uuid.NewString(),
+		ID:        uuid.NewString(),
 		UserID:    userId,
 		Token:     refreshToken,
 		ExpiresAt: refreshTokenExpiresAt,
@@ -314,7 +321,26 @@ func (s *service) GetAccessTokenByRefreshToken(
 	*AccessTokenPayload,
 	*cerror.CustomError,
 ) {
-	refreshTokenDocument, customError := s.repository.FindRefreshTokenWithUserId(ctx, userId)
+	refreshTokenClaims, err := s.jwtGenerator.VerifyRefreshToken(refreshToken)
+	if err != nil {
+		return nil, &cerror.CustomError{
+			HttpStatusCode: http.StatusForbidden,
+			LogMessage:     "ambiguous refresh token",
+			LogSeverity:    zap.WarnLevel,
+		}
+	}
+
+	var (
+		tokenCreatedAt = refreshTokenClaims.IssuedAt.Time
+		tokenExpiresAt = refreshTokenClaims.ExpiresAt.Time
+	)
+	refreshTokenDocument, customError := s.repository.FindRefreshTokenByUserId(
+		ctx,
+		userId,
+		refreshToken,
+		tokenCreatedAt,
+		tokenExpiresAt,
+	)
 	if customError != nil {
 		return nil, customError
 	}
@@ -343,8 +369,12 @@ func (s *service) GetAccessTokenByRefreshToken(
 		return nil, customError
 	}
 
-	accessTokenExpiresAt := time.Now().UTC().Add(5 * time.Minute)
-	accessToken, err := s.jwtGenerator.GenerateAccessToken(accessTokenExpiresAt, user.Name, user.Email, user.Id)
+	accessToken, err := s.jwtGenerator.GenerateAccessToken(
+		jwt_generator.AccessTokenExpirationDuration,
+		user.Name,
+		user.Email,
+		user.ID,
+	)
 	if err != nil {
 		cerr := cerror.ErrorGenerateAccessToken
 		cerr.LogFields = []zap.Field{

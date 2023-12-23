@@ -4,7 +4,6 @@ package jwt_generator
 
 import (
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -74,9 +73,8 @@ func TestJwtGenerator_GenerateAccessToken(t *testing.T) {
 			PublicKey:  TestPublicKey,
 		})
 
-		expirationDate := time.Now().UTC().Add(5 * time.Minute)
 		token, err := jwtGenerator.GenerateAccessToken(
-			expirationDate,
+			AccessTokenExpirationDuration,
 			TestUserName,
 			TestUserEmail,
 			TestUserID,
@@ -94,8 +92,7 @@ func TestJwtGenerator_GenerateRefreshToken(t *testing.T) {
 			PublicKey:  TestPublicKey,
 		})
 
-		expirationTime := time.Now().UTC().Add(24 * time.Hour)
-		token, err := jwtGenerator.GenerateRefreshToken(expirationTime, TestUserID)
+		token, err := jwtGenerator.GenerateRefreshToken(RefreshTokenExpirationDuration, TestUserID)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, token)
@@ -109,9 +106,8 @@ func TestJwtGenerator_VerifyAccessToken(t *testing.T) {
 			PublicKey:  TestPublicKey,
 		})
 
-		expirationDate := time.Now().UTC().Add(5 * time.Minute)
 		token, err := jwtGenerator.GenerateAccessToken(
-			expirationDate,
+			AccessTokenExpirationDuration,
 			TestUserName,
 			TestUserEmail,
 			TestUserID,

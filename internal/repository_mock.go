@@ -11,6 +11,7 @@ package user
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 	cerror "user-service/pkg/cerror"
 
 	gomock "go.uber.org/mock/gomock"
@@ -39,19 +40,19 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 	return m.recorder
 }
 
-// FindRefreshTokenWithUserId mocks base method.
-func (m *MockRepository) FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, *cerror.CustomError) {
+// FindRefreshTokenByUserId mocks base method.
+func (m *MockRepository) FindRefreshTokenByUserId(ctx context.Context, userId, token string, tokenCreatedAt, tokenExpiresAt time.Time) (*RefreshTokenHistoryTable, *cerror.CustomError) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindRefreshTokenWithUserId", ctx, userId)
+	ret := m.ctrl.Call(m, "FindRefreshTokenByUserId", ctx, userId, token, tokenCreatedAt, tokenExpiresAt)
 	ret0, _ := ret[0].(*RefreshTokenHistoryTable)
 	ret1, _ := ret[1].(*cerror.CustomError)
 	return ret0, ret1
 }
 
-// FindRefreshTokenWithUserId indicates an expected call of FindRefreshTokenWithUserId.
-func (mr *MockRepositoryMockRecorder) FindRefreshTokenWithUserId(ctx, userId any) *gomock.Call {
+// FindRefreshTokenByUserId indicates an expected call of FindRefreshTokenByUserId.
+func (mr *MockRepositoryMockRecorder) FindRefreshTokenByUserId(ctx, userId, token, tokenCreatedAt, tokenExpiresAt any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRefreshTokenWithUserId", reflect.TypeOf((*MockRepository)(nil).FindRefreshTokenWithUserId), ctx, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRefreshTokenByUserId", reflect.TypeOf((*MockRepository)(nil).FindRefreshTokenByUserId), ctx, userId, token, tokenCreatedAt, tokenExpiresAt)
 }
 
 // FindUserWithEmail mocks base method.

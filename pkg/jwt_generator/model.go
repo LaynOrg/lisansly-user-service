@@ -1,11 +1,18 @@
 package jwt_generator
 
-import "github.com/golang-jwt/jwt/v4"
+import (
+	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+)
 
 const (
 	IssuerDefault = "lisansly"
+	PlanDefault   = "free"
 
-	PlanDefault = "free"
+	AccessTokenExpirationDuration          = 5 * time.Minute
+	RefreshTokenExpirationDuration         = 24 * time.Hour
+	IdentityVerificationExpirationDuration = 3 * time.Hour
 )
 
 type Claims struct {

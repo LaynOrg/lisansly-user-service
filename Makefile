@@ -7,7 +7,7 @@ build:
 	env GOOS=linux GOARCH=arm64 go build -o build/register/bootstrap internal/register/main.go
 	env GOOS=linux GOARCH=arm64 go build -o build/login/bootstrap internal/login/main.go
 	env GOOS=linux GOARCH=arm64 go build -o build/getUserById/bootstrap internal/getUserById/main.go
-	env GOOS=linux GOARCH=arm64 go build -o build/getAccessTokenViaRefreshToken/bootstrap internal/getAccessTokenViaRefreshToken/main.go
+	env GOOS=linux GOARCH=arm64 go build -o build/getAccessTokenByRefreshToken/bootstrap internal/getAccessTokenByRefreshToken/main.go
 	env GOOS=linux GOARCH=arm64 go build -o build/updateUserById/bootstrap internal/updateUserById/main.go
 
 .PHONY: zip
@@ -15,7 +15,7 @@ zip:
 	zip -j build/register/register.zip build/register/bootstrap
 	zip -j build/login/login.zip build/login/bootstrap
 	zip -j build/getUserById/getUserById.zip build/getUserById/bootstrap
-	zip -j build/getAccessTokenViaRefreshToken/getAccessTokenViaRefreshToken.zip build/getAccessTokenViaRefreshToken/bootstrap
+	zip -j build/getAccessTokenByRefreshToken/getAccessTokenByRefreshToken.zip build/getAccessTokenByRefreshToken/bootstrap
 	zip -j build/updateUserById/updateUserById.zip build/updateUserById/bootstrap
 
 security-analysis:

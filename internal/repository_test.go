@@ -62,7 +62,7 @@ func TestRepository_InsertUser(t *testing.T) {
 		)
 
 		cerr := userRepository.InsertUser(ctx, &Table{
-			Id:       TestUserId,
+			ID:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -79,7 +79,7 @@ func TestRepository_InsertUser(t *testing.T) {
 		createUserUniquenessTable(t, ctx, dynamodbClient)
 
 		fakeUserItem, err := attributevalue.MarshalMap(&Table{
-			Id:        TestUserId,
+			ID:        TestUserId,
 			Name:      TestUserName,
 			Email:     TestEmail,
 			Password:  TestPassword,
@@ -124,7 +124,7 @@ func TestRepository_InsertUser(t *testing.T) {
 		)
 
 		cerr := userRepository.InsertUser(ctx, &Table{
-			Id:       TestUserId,
+			ID:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -153,7 +153,7 @@ func TestRepository_InsertUser(t *testing.T) {
 		)
 
 		cerr := userRepository.InsertUser(ctx, &Table{
-			Id:       TestUserId,
+			ID:       TestUserId,
 			Email:    TestEmail,
 			Password: TestPassword,
 		})
@@ -175,7 +175,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 
 		now := time.Now().UTC()
 		item, err := attributevalue.MarshalMap(&Table{
-			Id:        TestUserId,
+			ID:        TestUserId,
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
@@ -203,7 +203,7 @@ func TestRepository_FindUserWithId(t *testing.T) {
 		)
 
 		assert.Equal(t, &Table{
-			Id:        TestUserId,
+			ID:        TestUserId,
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
@@ -276,7 +276,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 
 		now := time.Now().UTC()
 		item, err := attributevalue.MarshalMap(&Table{
-			Id:        TestUserId,
+			ID:        TestUserId,
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
@@ -304,7 +304,7 @@ func TestRepository_FindUserWithEmail(t *testing.T) {
 		)
 
 		assert.Equal(t, &Table{
-			Id:        TestUserId,
+			ID:        TestUserId,
 			Name:      TestUserId,
 			Email:     TestEmail,
 			Password:  TestPassword,
@@ -383,12 +383,15 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 				},
 			}, nil, nil)
 
-		err := userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
-			Id:        "abcd-abcd-abcd-abcd",
+		item := RefreshTokenHistoryTable{
+			ID:        "abcd-abcd-abcd-abcd",
 			UserID:    "abcd-abcd-abcd-abcd",
 			Token:     "abcd.abcd.abcd",
 			ExpiresAt: time.Now().UTC(),
-		})
+		}
+		nowUtc := time.Now().UTC()
+
+		err := userRepository.InsertRefreshTokenHistory(ctx, item.Build(nowUtc))
 
 		assert.Nil(t, err)
 	})
@@ -413,7 +416,7 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 			}, nil, nil)
 
 		err = userRepository.InsertRefreshTokenHistory(ctx, &RefreshTokenHistoryTable{
-			Id:        "abcd-abcd-abcd-abcd",
+			ID:        "abcd-abcd-abcd-abcd",
 			UserID:    "abcd-abcd-abcd-abcd",
 			Token:     "abcd.abcd.abcd",
 			ExpiresAt: time.Now().UTC(),
@@ -423,25 +426,27 @@ func TestRepository_InsertRefreshTokenHistory(t *testing.T) {
 	})
 }
 
-func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
+func TestRepository_FindRefreshTokenByUserId(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		ctx := context.Background()
 		container, dynamodbClient := createDynamoDbClient(t, ctx)
 		defer container.Terminate(ctx)
 		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
 
-		now := time.Now().UTC().Add(10 * time.Minute)
-		item, err := attributevalue.MarshalMap(&RefreshTokenHistoryTable{
-			Id:        TestRefreshTokenHistoryItemId,
+		tokenCreatedAt := time.Now().UTC()
+		tokenExpiresAt := tokenCreatedAt.Add(24 * time.Minute)
+		marshalledItem, err := attributevalue.MarshalMap(RefreshTokenHistoryTable{
+			ID:        TestUserId,
 			UserID:    TestUserId,
 			Token:     TestAccessToken,
-			ExpiresAt: now,
-		})
+			ExpiresAt: tokenExpiresAt,
+		}.Build(tokenCreatedAt))
+		require.NoError(t, err)
 
 		_, err = dynamodbClient.PutItem(
 			ctx,
 			&dynamodb.PutItemInput{
-				Item:      item,
+				Item:      marshalledItem,
 				TableName: aws.String(TestDynamoDbRefreshTokenHistoryTable),
 			},
 		)
@@ -452,16 +457,115 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
 		}, nil, nil)
-		user, cerr := repository.FindRefreshTokenWithUserId(
+
+		user, cerr := repository.FindRefreshTokenByUserId(
 			ctx,
 			TestUserId,
+			TestRefreshToken,
+			tokenCreatedAt,
+			tokenExpiresAt,
 		)
 
+		partitionKey := fmt.Sprintf("%s#%s", TestUserId, TestRefreshToken)
+		sortKey := fmt.Sprintf("%d#%d", tokenCreatedAt.Unix(), tokenExpiresAt.Unix())
 		assert.Equal(t, &RefreshTokenHistoryTable{
-			Id:        TestRefreshTokenHistoryItemId,
+			ID:        partitionKey,
+			SortKey:   sortKey,
 			UserID:    TestUserId,
 			Token:     TestAccessToken,
-			ExpiresAt: now,
+			ExpiresAt: tokenExpiresAt,
+		}, user)
+		assert.Nil(t, cerr)
+	})
+
+	t.Run("when multiple tokens belongs to user should get last one of them and return it", func(t *testing.T) {
+		ctx := context.Background()
+		container, dynamodbClient := createDynamoDbClient(t, ctx)
+		defer container.Terminate(ctx)
+		createRefreshTokenHistoryTable(t, ctx, dynamodbClient)
+
+		firstItemCreatedAt := time.Now().UTC()
+		firstItemExpiresAt := firstItemCreatedAt.Add(24 * time.Hour)
+		firstMarshalledItem, err := attributevalue.MarshalMap(RefreshTokenHistoryTable{
+			ID:        TestUserId,
+			UserID:    TestUserId,
+			Token:     TestAccessToken,
+			ExpiresAt: firstItemExpiresAt,
+		}.Build(firstItemCreatedAt))
+		require.NoError(t, err)
+
+		secondItemCreatedAt := time.Now().UTC()
+		secondItemExpiresAt := secondItemCreatedAt.Add(24 * time.Hour)
+		secondMarshalledItem, err := attributevalue.MarshalMap(RefreshTokenHistoryTable{
+			ID:        TestUserId,
+			UserID:    TestUserId,
+			Token:     TestAccessToken,
+			ExpiresAt: secondItemExpiresAt,
+		}.Build(secondItemExpiresAt))
+		require.NoError(t, err)
+
+		thirdItemCreatedAt := time.Now().UTC()
+		thirdItemExpiresAt := thirdItemCreatedAt.Add(24 * time.Minute)
+		thirdMarshalledItem, err := attributevalue.MarshalMap(RefreshTokenHistoryTable{
+			ID:        TestUserId,
+			UserID:    TestUserId,
+			Token:     TestAccessToken,
+			ExpiresAt: thirdItemExpiresAt,
+		}.Build(thirdItemCreatedAt))
+		require.NoError(t, err)
+
+		_, err = dynamodbClient.TransactWriteItems(
+			ctx,
+			&dynamodb.TransactWriteItemsInput{
+				TransactItems: []types.TransactWriteItem{
+					{
+						Put: &types.Put{
+							Item:      firstMarshalledItem,
+							TableName: aws.String(TestDynamoDbRefreshTokenHistoryTable),
+						},
+					},
+					{
+						Put: &types.Put{
+							Item:      secondMarshalledItem,
+							TableName: aws.String(TestDynamoDbRefreshTokenHistoryTable),
+						},
+					},
+					{
+						Put: &types.Put{
+							Item:      thirdMarshalledItem,
+							TableName: aws.String(TestDynamoDbRefreshTokenHistoryTable),
+						},
+					},
+				},
+			},
+		)
+		require.NoError(t, err)
+
+		repository := NewRepository(dynamodbClient, &config.DynamoDbConfig{
+			Tables: map[string]string{
+				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
+			},
+		}, nil, nil)
+
+		user, cerr := repository.FindRefreshTokenByUserId(
+			ctx,
+			TestUserId,
+			TestRefreshToken,
+			thirdItemCreatedAt,
+			thirdItemExpiresAt,
+		)
+
+		partitionKey := fmt.Sprintf("%s#%s", TestUserId, TestRefreshToken)
+		sortKey := fmt.Sprintf("%d#%d",
+			thirdItemCreatedAt.Unix(),
+			thirdItemExpiresAt.Unix(),
+		)
+		assert.Equal(t, &RefreshTokenHistoryTable{
+			ID:        partitionKey,
+			SortKey:   sortKey,
+			UserID:    TestUserId,
+			Token:     TestAccessToken,
+			ExpiresAt: thirdItemExpiresAt,
 		}, user)
 		assert.Nil(t, cerr)
 	})
@@ -482,9 +586,14 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
 		}, nil, nil)
-		user, cerr := repository.FindRefreshTokenWithUserId(
+
+		tokenCreatedAt := time.Now().UTC()
+		user, cerr := repository.FindRefreshTokenByUserId(
 			ctx,
 			TestUserId,
+			TestRefreshToken,
+			tokenCreatedAt,
+			tokenCreatedAt.Add(24*time.Hour),
 		)
 
 		assert.Error(t, cerr)
@@ -506,9 +615,14 @@ func TestRepository_FindRefreshTokenWithUserId(t *testing.T) {
 				config.DynamoDbRefreshTokenHistoryTable: TestDynamoDbRefreshTokenHistoryTable,
 			},
 		}, nil, nil)
-		user, cerr := repository.FindRefreshTokenWithUserId(
+
+		tokenCreatedAt := time.Now().UTC()
+		user, cerr := repository.FindRefreshTokenByUserId(
 			ctx,
 			TestUserId,
+			TestRefreshToken,
+			tokenCreatedAt,
+			tokenCreatedAt.Add(24*time.Hour),
 		)
 
 		assert.Error(t, cerr)
@@ -530,7 +644,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			createUserUniquenessTable(t, ctx, dynamodbClient)
 
 			fakeUserItem, err := attributevalue.MarshalMap(&Table{
-				Id:        TestUserId,
+				ID:        TestUserId,
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
@@ -591,7 +705,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			createUserUniquenessTable(t, ctx, dynamodbClient)
 
 			fakeUserItem, err := attributevalue.MarshalMap(&Table{
-				Id:        TestUserId,
+				ID:        TestUserId,
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
@@ -717,7 +831,7 @@ func TestRepository_UpdateUserById(t *testing.T) {
 			createUserTable(t, ctx, dynamodbClient)
 
 			fakeUserItem, err := attributevalue.MarshalMap(&Table{
-				Id:        TestUserId,
+				ID:        TestUserId,
 				Name:      TestUserName,
 				Email:     TestEmail,
 				Password:  TestPassword,
@@ -810,7 +924,7 @@ func TestRepository_InsertIdentityVerificationHistory(t *testing.T) {
 			}, nil, nil)
 
 		err := userRepository.InsertIdentityVerificationHistory(ctx, &IdentityVerificationTable{
-			Id:        "abcd-abcd-abcd-abcd",
+			ID:        "abcd-abcd-abcd-abcd",
 			UserID:    "abcd-abcd-abcd-abcd",
 			Type:      IdentityEmail,
 			Code:      "abcd.abcd.abcd",
@@ -834,7 +948,7 @@ func TestRepository_InsertIdentityVerificationHistory(t *testing.T) {
 			}, nil, nil)
 
 		err := userRepository.InsertIdentityVerificationHistory(ctx, &IdentityVerificationTable{
-			Id:        "abcd-abcd-abcd-abcd",
+			ID:        "abcd-abcd-abcd-abcd",
 			UserID:    "abcd-abcd-abcd-abcd",
 			Type:      IdentityEmail,
 			Code:      "abcd.abcd.abcd",
@@ -933,11 +1047,19 @@ func createRefreshTokenHistoryTable(t *testing.T, ctx context.Context, dynamodbC
 				AttributeName: aws.String("id"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
+			{
+				AttributeName: aws.String("sortKey"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
 				AttributeName: aws.String("id"),
 				KeyType:       types.KeyTypeHash,
+			},
+			{
+				AttributeName: aws.String("sortKey"),
+				KeyType:       types.KeyTypeRange,
 			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{

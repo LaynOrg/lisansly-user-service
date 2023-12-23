@@ -35,7 +35,7 @@ functions:
     package:
       artifact: build/updateUserById/updateUserById.zip
 
-  getAccessTokenViaRefreshToken:
+  getAccessTokenByRefreshToken:
     handler: bootstrap
     package:
-      artifact: build/getAccessTokenViaRefreshToken/getAccessTokenViaRefreshToken.zip
+      artifact: build/getAccessTokenByRefreshToken/getAccessTokenByRefreshToken.zip

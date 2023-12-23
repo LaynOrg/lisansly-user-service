@@ -3,7 +3,9 @@ package user
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -24,7 +26,13 @@ type Repository interface {
 	FindUserWithId(ctx context.Context, userId string) (*Table, *cerror.CustomError)
 	FindUserWithEmail(ctx context.Context, email string) (*Table, *cerror.CustomError)
 	InsertRefreshTokenHistory(ctx context.Context, refreshTokenHistory *RefreshTokenHistoryTable) *cerror.CustomError
-	FindRefreshTokenWithUserId(ctx context.Context, userId string) (*RefreshTokenHistoryTable, *cerror.CustomError)
+	FindRefreshTokenByUserId(
+		ctx context.Context,
+		userId string,
+		token string,
+		tokenCreatedAt time.Time,
+		tokenExpiresAt time.Time,
+	) (*RefreshTokenHistoryTable, *cerror.CustomError)
 	UpdateUserById(ctx context.Context, userId string, user *UpdateUserPayload) *cerror.CustomError
 	InsertIdentityVerificationHistory(
 		ctx context.Context, identityVerification *IdentityVerificationTable,
@@ -321,17 +329,35 @@ func (r *repository) FindUserWithEmail(ctx context.Context, email string) (*Tabl
 	return user, nil
 }
 
-func (r *repository) FindRefreshTokenWithUserId(
-	ctx context.Context, userId string,
+func (r *repository) FindRefreshTokenByUserId(
+	ctx context.Context,
+	userId string,
+	token string,
+	tokenCreatedAt time.Time,
+	tokenExpiresAt time.Time,
 ) (*RefreshTokenHistoryTable, *cerror.CustomError) {
-	var err error
+	var (
+		err          error
+		partitionKey = fmt.Sprintf(
+			"%s#%s",
+			userId,
+			token,
+		)
+		sortKey = fmt.Sprintf(
+			"%d#%d",
+			tokenCreatedAt.Unix(),
+			tokenExpiresAt.Unix(),
+		)
+	)
 
-	condition := expression.Name("userId").Equal(expression.Value(userId))
-
+	keyCondition := expression.Key("id").Equal(expression.Value(partitionKey)).And(
+		expression.Key("sortKey").
+			LessThanEqual(expression.Value(sortKey)),
+	)
 	var expr expression.Expression
 	expr, err = expression.
 		NewBuilder().
-		WithFilter(condition).
+		WithKeyCondition(keyCondition).
 		Build()
 	if err != nil {
 		cerr := cerror.ErrorBuildExpression
@@ -341,12 +367,15 @@ func (r *repository) FindRefreshTokenWithUserId(
 		return nil, cerr
 	}
 
-	var result *dynamodb.ScanOutput
-	result, err = r.dynamodbClient.Scan(ctx, &dynamodb.ScanInput{
-		FilterExpression:          expr.Filter(),
+	tableName := r.dynamodbConfig.Tables[config.DynamoDbRefreshTokenHistoryTable]
+	var result *dynamodb.QueryOutput
+	result, err = r.dynamodbClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(tableName),
+		KeyConditionExpression:    expr.KeyCondition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
-		TableName:                 aws.String(r.dynamodbConfig.Tables[config.DynamoDbRefreshTokenHistoryTable]),
+		Limit:                     aws.Int32(1),
+		ScanIndexForward:          aws.Bool(true),
 	})
 	if err != nil {
 		return nil, &cerror.CustomError{

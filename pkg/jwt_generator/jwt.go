@@ -12,9 +12,10 @@ import (
 )
 
 type JwtGenerator interface {
-	GenerateAccessToken(expirationTime time.Time, name, email, userId string) (string, error)
-	GenerateRefreshToken(expirationTime time.Time, userId string) (string, error)
+	GenerateAccessToken(expirationTime time.Duration, name, email, userId string) (string, error)
+	GenerateRefreshToken(expirationTime time.Duration, userId string) (string, error)
 	VerifyAccessToken(rawJwtToken string) (*Claims, error)
+	VerifyRefreshToken(rawJwtToken string) (*Claims, error)
 }
 
 type jwtGenerator struct {
@@ -40,10 +41,11 @@ func NewJwtGenerator(jwtConfig *config.JwtConfig) (JwtGenerator, error) {
 }
 
 func (jwtGenerator *jwtGenerator) GenerateAccessToken(
-	expirationTime time.Time,
+	expirationTime time.Duration,
 	name, email, userId string,
 ) (string, error) {
-	now := time.Now().UTC()
+	issuedAt := time.Now().UTC()
+	expiresAt := issuedAt.Add(expirationTime)
 	claims := Claims{
 		Name:  name,
 		Email: email,
@@ -52,43 +54,51 @@ func (jwtGenerator *jwtGenerator) GenerateAccessToken(
 			ID:        uuid.New().String(),
 			Subject:   userId,
 			Issuer:    IssuerDefault,
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(issuedAt),
+			NotBefore: jwt.NewNumericDate(issuedAt),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-
-	signedToken, err := token.SignedString(jwtGenerator.privateKey)
-	if err != nil {
-		return "", err
-	}
-
-	return signedToken, nil
+	return jwtGenerator.generateJwt(claims)
 }
 
-func (jwtGenerator *jwtGenerator) GenerateRefreshToken(expirationTime time.Time, userId string) (string, error) {
-	now := time.Now().UTC()
-	claims := jwt.RegisteredClaims{
-		ID:        uuid.New().String(),
-		Issuer:    IssuerDefault,
-		Subject:   userId,
-		ExpiresAt: jwt.NewNumericDate(expirationTime),
-		IssuedAt:  jwt.NewNumericDate(now),
+func (jwtGenerator *jwtGenerator) GenerateRefreshToken(expirationTime time.Duration, userId string) (string, error) {
+	issuedAt := time.Now().UTC()
+	expiresAt := issuedAt.Add(expirationTime)
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.New().String(),
+			Issuer:    IssuerDefault,
+			Subject:   userId,
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(issuedAt),
+		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-
-	signedToken, err := token.SignedString(jwtGenerator.privateKey)
-	if err != nil {
-		return "", err
-	}
-
-	return signedToken, nil
+	return jwtGenerator.generateJwt(claims)
 }
 
 func (jwtGenerator *jwtGenerator) VerifyAccessToken(rawJwtToken string) (*Claims, error) {
+	return jwtGenerator.verifyJwt(rawJwtToken, true)
+}
+
+func (jwtGenerator *jwtGenerator) VerifyRefreshToken(rawJwtToken string) (*Claims, error) {
+	return jwtGenerator.verifyJwt(rawJwtToken, false)
+}
+
+func (jwtGenerator *jwtGenerator) generateJwt(claims Claims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+
+	signedToken, err := token.SignedString(jwtGenerator.privateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return signedToken, nil
+}
+
+func (jwtGenerator *jwtGenerator) verifyJwt(rawJwtToken string, validateIsTokenStarted bool) (*Claims, error) {
 	var (
 		err    error
 		claims Claims
@@ -116,9 +126,11 @@ func (jwtGenerator *jwtGenerator) VerifyAccessToken(rawJwtToken string) (*Claims
 		return nil, errors.New("expired jwt token")
 	}
 
-	isTokenStarted := claims.VerifyNotBefore(now, true)
-	if !isTokenStarted {
-		return nil, errors.New("jwt token is not started")
+	if validateIsTokenStarted {
+		isTokenStarted := claims.VerifyNotBefore(now, true)
+		if !isTokenStarted {
+			return nil, errors.New("jwt token is not started")
+		}
 	}
 
 	return &claims, nil

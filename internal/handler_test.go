@@ -358,7 +358,7 @@ func TestHandler_Login(t *testing.T) {
 
 func TestHandler_GetUserById(t *testing.T) {
 	testUser := &Table{
-		Id:        "abcd-abcd-abcd-abcd",
+		ID:        "abcd-abcd-abcd-abcd",
 		Name:      "test",
 		Email:     "test@test.com",
 		Password:  "Asdfg12345_",
@@ -384,7 +384,7 @@ func TestHandler_GetUserById(t *testing.T) {
 
 		h := NewHandler(nil, mockRepository)
 		user, err := h.GetUserById(ctx, &GetUserByIdPayload{
-			Id: userId,
+			ID: userId,
 		})
 
 		assert.Equal(t, testUser, user)
@@ -403,7 +403,7 @@ func TestHandler_GetUserById(t *testing.T) {
 
 		h := NewHandler(nil, mockRepository)
 		user, err := h.GetUserById(ctx, &GetUserByIdPayload{
-			Id: userId,
+			ID: userId,
 		})
 
 		assert.Equal(t, testUser, user)
@@ -418,7 +418,7 @@ func TestHandler_GetUserById(t *testing.T) {
 
 		h := NewHandler(nil, nil)
 		response, cerr := h.GetUserById(ctx, &GetUserByIdPayload{
-			Id: "",
+			ID: "",
 		})
 		assert.Error(t, cerr)
 
@@ -452,7 +452,7 @@ func TestHandler_GetUserById(t *testing.T) {
 
 		h := NewHandler(nil, mockRepository)
 		response, cerr := h.GetUserById(ctx, &GetUserByIdPayload{
-			Id: userId,
+			ID: userId,
 		})
 
 		assert.Error(t, cerr)
@@ -482,7 +482,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				gomock.Any(),
 				userId,
 				&UpdateUserPayload{
-					Id:       userId,
+					ID:       userId,
 					Name:     "test",
 					Email:    "test@test.com",
 					Password: "Asdfg12345_",
@@ -495,7 +495,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 		h := NewHandler(mockService, nil)
 		tokens, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
-			Id:       userId,
+			ID:       userId,
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
@@ -518,7 +518,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				gomock.Any(),
 				userId,
 				&UpdateUserPayload{
-					Id:       userId,
+					ID:       userId,
 					Name:     "test",
 					Email:    "test@test.com",
 					Password: "Asdfg12345_",
@@ -531,7 +531,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 		h := NewHandler(mockService, nil)
 		tokens, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
-			Id:       userId,
+			ID:       userId,
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
@@ -553,7 +553,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 			h := NewHandler(nil, nil)
 			response, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
-				Id:       "abcdabcd",
+				ID:       "abcdabcd",
 				Name:     "test",
 				Email:    "test@test.com",
 				Password: "Asdfg12345_",
@@ -593,7 +593,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 			h := NewHandler(mockService, nil)
 			response, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
-				Id:       userId,
+				ID:       userId,
 				Name:     "test",
 				Email:    "",
 				Password: "",
@@ -611,7 +611,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 
 			h := NewHandler(nil, nil)
 			response, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
-				Id:       uuid.NewString(),
+				ID:       uuid.NewString(),
 				Name:     "",
 				Email:    "",
 				Password: "",
@@ -644,7 +644,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 				gomock.Any(),
 				userId,
 				&UpdateUserPayload{
-					Id:       userId,
+					ID:       userId,
 					Name:     "test",
 					Email:    "test@test.com",
 					Password: "Asdfg12345_",
@@ -660,7 +660,7 @@ func TestHandler_UpdateUserById(t *testing.T) {
 		h := NewHandler(mockService, nil)
 
 		response, cerr := h.UpdateUserById(ctx, &UpdateUserPayload{
-			Id:       userId,
+			ID:       userId,
 			Name:     "test",
 			Email:    "test@test.com",
 			Password: "Asdfg12345_",
@@ -703,7 +703,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 
 		h := NewHandler(mockService, nil)
 		response, err := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
-			UserId:       userId,
+			UserID:       userId,
 			RefreshToken: "abcd.abcd.abcd",
 		})
 
@@ -732,7 +732,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 
 		h := NewHandler(mockService, nil)
 		response, err := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
-			UserId:       userId,
+			UserID:       userId,
 			RefreshToken: "abcd.abcd.abcd",
 		})
 
@@ -749,7 +749,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 
 			h := NewHandler(nil, nil)
 			response, cerr := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
-				UserId:       "notValid",
+				UserID:       "notValid",
 				RefreshToken: "abcd.abcd.abcd",
 			})
 
@@ -774,7 +774,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 
 			h := NewHandler(nil, nil)
 			response, cerr := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
-				UserId:       userId,
+				UserID:       userId,
 				RefreshToken: "",
 			})
 
@@ -815,7 +815,7 @@ func TestHandler_GetAccessTokenViaRefreshToken(t *testing.T) {
 
 		h := NewHandler(mockService, nil)
 		response, cerr := h.GetAccessTokenViaRefreshToken(ctx, &GetAccessTokenViaRefreshTokenPayload{
-			UserId:       userId,
+			UserID:       userId,
 			RefreshToken: "abcd.abcd.abcd",
 		})
 
